@@ -1,0 +1,19 @@
+{
+  "name": "svg-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SVG editor CLI",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "cli": "tsx src/main.ts",
+    "start": "node dist/main.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
+  }
+}
