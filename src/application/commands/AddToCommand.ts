@@ -2,7 +2,6 @@ import type {
   DetachedSubtree,
   SvgDocument,
 } from "../../domain/document/SvgDocument.js";
-import { GroupShape } from "../../domain/shape/GroupShape.js";
 import type { EditCommand } from "../CommandBus.js";
 
 export class AddToCommand implements EditCommand {
@@ -20,17 +19,9 @@ export class AddToCommand implements EditCommand {
       throw new Error("addto command is already executed");
     }
 
-    const parent = document.find(this.containerId);
-
-    if (parent === undefined) {
-      throw new RangeError(`no such container: ${this.containerId}`);
-    }
-
-    if (!(parent instanceof GroupShape)) {
-      throw new RangeError(`not a container: ${this.containerId}`);
-    }
-
+    const parent = document.requireContainer(this.containerId);
     const shape = document.require(this.id);
+
     this.previous = document.moveTo(shape, parent);
   }
 
@@ -43,7 +34,6 @@ export class AddToCommand implements EditCommand {
     }
 
     document.moveTo(previous.shape, previous.parent, previous.index);
-
     this.previous = undefined;
   }
 }
