@@ -11,7 +11,7 @@ export class Repl {
     private readonly commands: CommandRegistry,
   ) {}
 
-  /** 创建读行接口，交互持续到退出命令或输入流结束。 */
+  /** 创建读行接口，并在关闭时解除输入监听。 */
   public start(): void {
     const terminal: Interface = createInterface({
       input: stdin,
@@ -19,15 +19,20 @@ export class Repl {
       terminal: Boolean(stdin.isTTY && stdout.isTTY),
     });
 
+    const onLine = (line: string): void => {
+      this.handleLine(terminal, line);
+    };
+
+    terminal.on("line", onLine);
+
+    terminal.once("close", () => {
+      terminal.off("line", onLine);
+    });
+
     stdout.write("svg-editor 0.1\n");
     terminal.setPrompt(this.prompt);
     terminal.prompt();
-
-    terminal.on("line", (line: string) => {
-      this.handleLine(terminal, line);
-    });
   }
-
   /** 分词、执行并输出结果；单次输入失败不结束交互。 */
   private handleLine(terminal: Interface, line: string): void {
     try {
