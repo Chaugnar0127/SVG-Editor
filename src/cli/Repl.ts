@@ -4,6 +4,7 @@ import { stdin, stdout } from "node:process";
 export class Repl {
   private readonly prompt = "svg> ";
 
+  /** 创建终端读行接口并监听输入，交互持续到退出命令或输入流结束。 */
   public start(): void {
     const terminal: Interface = createInterface({
       input: stdin,
@@ -20,6 +21,10 @@ export class Repl {
     });
   }
 
+  /**
+   * 处理一行输入：退出时关闭读行接口，忽略空行和注释行。
+   * 其他输入当前统一提示尚未实现，处理完后显示下一次提示符。
+   */
   private handleLine(terminal: Interface, line: string): void {
     const input = line.trim();
 
