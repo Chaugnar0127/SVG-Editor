@@ -1,15 +1,22 @@
 import { createInterface, type Interface } from "node:readline";
 import { stdin, stdout } from "node:process";
+import type { CommandRegistry } from "./CommandRegistry.js";
+import type { Tokenizer } from "./Tokenizer.js";
 
 export class Repl {
   private readonly prompt = "svg> ";
 
-  /** 创建终端读行接口并监听输入，交互持续到退出命令或输入流结束。 */
+  public constructor(
+    private readonly tokenizer: Tokenizer,
+    private readonly commands: CommandRegistry,
+  ) {}
+
+  /** 创建读行接口，交互持续到退出命令或输入流结束。 */
   public start(): void {
     const terminal: Interface = createInterface({
       input: stdin,
       output: stdout,
-      terminal: true,
+      terminal: Boolean(stdin.isTTY && stdout.isTTY),
     });
 
     stdout.write("svg-editor 0.1\n");
@@ -21,20 +28,24 @@ export class Repl {
     });
   }
 
-  /**
-   * 处理一行输入：退出时关闭读行接口，忽略空行和注释行。
-   * 其他输入当前统一提示尚未实现，处理完后显示下一次提示符。
-   */
+  /** 分词、执行并输出结果；单次输入失败不结束交互。 */
   private handleLine(terminal: Interface, line: string): void {
-    const input = line.trim();
+    try {
+      const tokens = this.tokenizer.tokenize(line);
+      const result = this.commands.execute(tokens);
 
-    if (input === "exit" || input === "quit") {
-      terminal.close();
-      return;
-    }
+      if (result?.kind === "exit") {
+        terminal.close();
+        return;
+      }
 
-    if (input.length > 0 && !input.startsWith("#")) {
-      stdout.write(`error: command not implemented: ${input}\n`);
+      if (result?.kind === "message") {
+        stdout.write(`${result.text}\n`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      stdout.write(`error: ${message}\n`);
     }
 
     terminal.prompt();
