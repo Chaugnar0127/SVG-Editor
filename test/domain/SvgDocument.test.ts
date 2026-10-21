@@ -4,6 +4,151 @@ import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 
+test("requireContainer returns original groups at any depth and distinguishes lookup errors", () => {
+  const document = new SvgDocument();
+  const outer = new GroupShape("outer");
+  const inner = new GroupShape("inner");
+  const leaf = new RectShape("leaf", 10, 20, 30, 40);
+  inner.add(leaf);
+  outer.add(inner);
+  document.add(outer);
+
+  assert.strictEqual(document.requireContainer("outer"), outer);
+  assert.strictEqual(document.requireContainer("inner"), inner);
+  for (const id of ["missing", "Inner"]) {
+    assert.throws(() => document.requireContainer(id), {
+      name: "RangeError", message: `no such container: ${id}`,
+    });
+  }
+  assert.throws(() => document.requireContainer("leaf"), {
+    name: "RangeError", message: "not a container: leaf",
+  });
+  assert.deepEqual(document.topLevel(), [outer]);
+  assert.deepEqual(outer.children(), [inner]);
+  assert.strictEqual(inner.children()[0], leaf);
+});
+
+test("document inserts new subtrees at each position in a nested group", () => {
+  const document = new SvgDocument();
+  const outer = new GroupShape("outer");
+  const inner = new GroupShape("inner");
+  const sibling = new GroupShape("sibling");
+  outer.add(inner);
+  outer.add(sibling);
+  document.add(outer);
+  const first = new RectShape("first", 0, 0, 10, 10);
+  const middle = new RectShape("middle", 0, 0, 10, 10);
+  const last = new RectShape("last", 0, 0, 10, 10);
+  const subtree = new GroupShape("subtree");
+  const leaf = new RectShape("leaf", 10, 20, 30, 40);
+  subtree.add(leaf);
+
+  document.add(middle, inner);
+  document.add(first, inner, 0);
+  document.add(last, inner, 2);
+  document.add(subtree, inner, 1);
+
+  assert.deepEqual(inner.children(), [first, subtree, middle, last]);
+  for (const shape of [first, subtree, leaf, middle, last]) {
+    assert.strictEqual(document.require(shape.id), shape);
+  }
+  assert.deepEqual(document.topLevel(), [outer]);
+  assert.deepEqual(outer.children(), [inner, sibling]);
+  assert.deepEqual(sibling.children(), []);
+  assert.deepEqual(leaf.position, { x: 10, y: 20 });
+});
+
+test("group insertion rejects global and internal descendant ID conflicts without partial insertion", () => {
+  const document = new SvgDocument();
+  const destination = new GroupShape("destination");
+  const existing = new RectShape("shared", 0, 0, 10, 10);
+  document.add(destination);
+  document.add(existing);
+  const candidate = new GroupShape("candidate");
+  const left = new GroupShape("left");
+  const right = new GroupShape("right");
+  const conflict = new RectShape("shared", 10, 20, 30, 40);
+  left.add(conflict);
+  candidate.add(left);
+  candidate.add(right);
+
+  assert.throws(() => document.add(candidate, destination), {
+    name: "RangeError", message: "id already exists: shared",
+  });
+  assert.deepEqual(destination.children(), []);
+  assert.equal(document.find("candidate"), undefined);
+  assert.strictEqual(document.require("shared"), existing);
+
+  document.remove(existing);
+  right.add(new RectShape("shared", 0, 0, 10, 10));
+  assert.throws(() => document.add(candidate, destination), {
+    name: "RangeError", message: "id already exists: shared",
+  });
+  assert.deepEqual(destination.children(), []);
+  assert.deepEqual(candidate.children(), [left, right]);
+  assert.strictEqual(left.children()[0], conflict);
+  assert.equal(document.find("left"), undefined);
+
+  right.remove("shared");
+  document.add(candidate, destination);
+  assert.strictEqual(destination.children()[0], candidate);
+  assert.strictEqual(document.require("shared"), conflict);
+});
+
+test("group insertion rejects absent, foreign and detached parents by identity and allows retry", () => {
+  const document = new SvgDocument();
+  const actual = new GroupShape("parent");
+  const foreign = new GroupShape("parent");
+  const absent = new GroupShape("absent");
+  const candidate = new RectShape("candidate", 10, 20, 30, 40);
+  const foreignDocument = new SvgDocument();
+  document.add(actual);
+  foreignDocument.add(foreign);
+
+  for (const parent of [absent, foreign]) {
+    assert.throws(() => document.add(candidate, parent), {
+      name: "RangeError", message: `no such container: ${parent.id}`,
+    });
+    assert.deepEqual(document.topLevel(), [actual]);
+    assert.deepEqual(parent.children(), []);
+    assert.equal(document.find("candidate"), undefined);
+  }
+  const detached = document.remove(actual);
+  assert.throws(() => document.add(candidate, actual), {
+    name: "RangeError", message: "no such container: parent",
+  });
+  assert.deepEqual(document.topLevel(), []);
+  assert.deepEqual(actual.children(), []);
+  assert.strictEqual(foreignDocument.require("parent"), foreign);
+
+  document.restore(detached);
+  document.add(candidate, actual);
+  assert.strictEqual(actual.children()[0], candidate);
+});
+
+test("group insertion rejects invalid indices before changing either tree and permits retry", () => {
+  const document = new SvgDocument();
+  const parent = new GroupShape("parent");
+  const existing = new RectShape("existing", 0, 0, 10, 10);
+  parent.add(existing);
+  document.add(parent);
+  const candidate = new GroupShape("candidate");
+  const leaf = new RectShape("leaf", 10, 20, 30, 40);
+  candidate.add(leaf);
+
+  for (const index of [-1, 0.5, 2, NaN, Infinity, -Infinity]) {
+    assert.throws(() => document.add(candidate, parent, index), RangeError);
+    assert.deepEqual(parent.children(), [existing]);
+    assert.deepEqual(document.topLevel(), [parent]);
+    assert.equal(document.find("candidate"), undefined);
+    assert.equal(document.find("leaf"), undefined);
+    assert.strictEqual(candidate.children()[0], leaf);
+  }
+  document.add(candidate, parent, 0);
+  assert.deepEqual(parent.children(), [candidate, existing]);
+  assert.strictEqual(document.require("leaf"), leaf);
+});
+
 test("document uses default dimensions and accepts positive fractional dimensions", () => {
   const defaultDocument = new SvgDocument();
   assert.equal(defaultDocument.width, 800);
@@ -105,10 +250,10 @@ test("document inserts roots at the start, middle, and end while preserving obje
   const appended = new RectShape("appended", 0, 0, 10, 10);
   group.add(nested);
 
-  document.add(middle, 0);
-  document.add(first, 0);
-  document.add(last, 2);
-  document.add(group, 1);
+  document.add(middle, null, 0);
+  document.add(first, null, 0);
+  document.add(last, null, 2);
+  document.add(group, null, 1);
   document.add(appended);
 
   const expected = [first, group, middle, last, appended];
@@ -140,14 +285,14 @@ test("document rejects invalid insertion indices without changing roots and perm
     ];
 
     for (const index of invalidIndices) {
-      assert.throws(() => document.add(candidate, index), RangeError);
+      assert.throws(() => document.add(candidate, null, index), RangeError);
       assert.deepEqual(document.topLevel(), before);
       assert.equal(document.find("candidate"), undefined);
       assert.deepEqual(candidate.position, { x: 10, y: 20 });
     }
   }
 
-  document.add(candidate, 1);
+  document.add(candidate, null, 1);
   assert.deepEqual(document.topLevel(), [first, candidate, last]);
   assert.strictEqual(document.find("candidate"), candidate);
 });
@@ -170,7 +315,7 @@ test("indexed insertion rejects duplicate roots and descendant IDs before changi
 
   for (const index of [0, 1, 2]) {
     for (const shape of [existing, duplicate, candidate]) {
-      assert.throws(() => document.add(shape, index), RangeError);
+      assert.throws(() => document.add(shape, null, index), RangeError);
       assert.deepEqual(document.topLevel(), [existing, last]);
       assert.strictEqual(document.find("existing"), existing);
       assert.strictEqual(document.find("shared"), shared);
@@ -182,7 +327,7 @@ test("indexed insertion rejects duplicate roots and descendant IDs before changi
   }
 
   candidate.remove("shared");
-  document.add(candidate, 1);
+  document.add(candidate, null, 1);
   assert.deepEqual(document.topLevel(), [existing, candidate, last]);
   assert.strictEqual(document.find("valid"), valid);
 });
@@ -413,7 +558,7 @@ test("remove records each root position and permits reinsertion in the original 
     });
     assert.deepEqual(document.topLevel(), remaining);
 
-    document.add(detached.shape, detached.index);
+  document.add(detached.shape, null, detached.index);
     for (const [restoredIndex, root] of roots.entries()) {
       assert.strictEqual(document.topLevel()[restoredIndex], root);
     }
@@ -580,7 +725,7 @@ test("restore returns a whole subtree to each original root or nested position",
         }
       }
       if (parent === null) {
-        document.add(target, index);
+      document.add(target, null, index);
       } else {
         parent.add(target, index);
       }
@@ -1012,7 +1157,7 @@ for (const operation of ["bringToFront", "sendToBack"] as const) {
       target.add(inner);
       document.add(first);
       document.add(last);
-      document.add(target, sourceIndex);
+        document.add(target, null, sourceIndex);
       const originalOrder = document.topLevel();
       const expected = operation === "bringToFront"
         ? [first, last, target]
