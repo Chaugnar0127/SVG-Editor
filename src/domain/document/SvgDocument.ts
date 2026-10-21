@@ -77,15 +77,46 @@ export class SvgDocument {
     return shape;
   }
 
+  /** 获取必须存在的组，区分目标不存在和目标不是容器两种错误。 */
+  public requireContainer(id: string): GroupShape {
+    const shape = this.find(id);
+
+    if (shape === undefined) {
+      throw new RangeError(`no such container: ${id}`);
+    }
+
+    if (!(shape instanceof GroupShape)) {
+      throw new RangeError(`not a container: ${id}`);
+    }
+
+    return shape;
+  }
+
   /**
-   * 将新子树插入文档顶层的指定位置，省略位置时追加到末尾。
-   * 非法下标或重复 ID 会在修改前抛出 RangeError。
+   * 将新子树插入顶层或指定组，省略下标时追加到末尾。
+   * 父容器失效、ID 冲突或下标非法时，在修改前抛出 RangeError。
    */
-  public add(shape: Shape, index: number = this.rootShapes.length): void {
+  public add(
+    shape: Shape,
+    parent: GroupShape | null = null,
+    index?: number,
+  ): void {
+    if (parent !== null) {
+      if (this.find(parent.id) !== parent) {
+        throw new RangeError(`no such container: ${parent.id}`);
+      }
+
+      this.validateNewSubtree(shape);
+      parent.add(shape, index);
+      return;
+    }
+
+    const rootIndex = index ?? this.rootShapes.length;
+
     if (
-      !Number.isInteger(index) ||
-      index < 0 ||
-      index > this.rootShapes.length
+      !Number.isInteger(rootIndex) ||
+      rootIndex < 0 ||
+      rootIndex > this.rootShapes.length
     ) {
       throw new RangeError(
         "root index must be an integer within document bounds",
@@ -93,7 +124,7 @@ export class SvgDocument {
     }
 
     this.validateNewSubtree(shape);
-    this.rootShapes.splice(index, 0, shape);
+    this.rootShapes.splice(rootIndex, 0, shape);
   }
 
   /**
@@ -113,24 +144,11 @@ export class SvgDocument {
   }
 
   /**
-   * 将摘下的子树放回原父容器和原下标，保留原对象及其后代。
-   * 父容器失效、ID 冲突或下标非法时抛出 RangeError，不修改结构。
+   * 按记录将原子树放回指定父容器和下标。
+   * 插入规则统一由 add 校验。
    */
   public restore(detached: DetachedSubtree): void {
-    const { shape, parent, index } = detached;
-
-    if (parent === null) {
-      this.add(shape, index);
-      return;
-    }
-
-    // 原父容器必须仍是本文档中的同一个对象。
-    if (this.find(parent.id) !== parent) {
-      throw new RangeError(`no such container: ${parent.id}`);
-    }
-
-    this.validateNewSubtree(shape);
-    parent.add(shape, index);
+    this.add(detached.shape, detached.parent, detached.index);
   }
 
   /**
