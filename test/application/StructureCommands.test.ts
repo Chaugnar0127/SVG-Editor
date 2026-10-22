@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CommandBus } from "../../src/application/CommandBus.js";
 import { AddToCommand } from "../../src/application/commands/AddToCommand.js";
-import { BackCommand } from "../../src/application/commands/BackCommand.js";
+import { ReorderCommand } from "../../src/application/commands/ReorderCommand.js";
 import { DeleteCommand } from "../../src/application/commands/DeleteCommand.js";
-import { FrontCommand } from "../../src/application/commands/FrontCommand.js";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
@@ -148,7 +147,7 @@ test("failed addto undo retains the target location and history until the origin
   assert.deepEqual(destination.children(), [a, b, target]);
 });
 
-for (const [name, Command] of [["front", FrontCommand], ["back", BackCommand]] as const) {
+for (const name of ["front", "back"] as const) {
   test(`${name} changes only sibling order and undo restores a middle subtree at either level`, () => {
     for (const nested of [false, true]) {
       const { document, source, target, leaf, first, last, destination, a, b } = createScene(nested);
@@ -156,7 +155,7 @@ for (const [name, Command] of [["front", FrontCommand], ["back", BackCommand]] a
       const expected = name === "front"
         ? (source === null ? [first, last, destination, target] : [first, last, target])
         : (source === null ? [target, first, last, destination] : [target, first, last]);
-      const command = new Command("target");
+      const command = new ReorderCommand("target", name);
       for (let cycle = 0; cycle < 3; cycle += 1) {
         command.execute(document);
         assert.deepEqual(source === null ? document.topLevel() : source.children(), expected);
@@ -177,7 +176,7 @@ for (const [name, Command] of [["front", FrontCommand], ["back", BackCommand]] a
 
   test(`${name} rejects a missing target but permits a corrected retry on the same command`, () => {
     const document = new SvgDocument();
-    const command = new Command("target");
+    const command = new ReorderCommand("target", name);
     assert.throws(() => command.execute(document), {
       name: "RangeError",
       message: "no such shape: target",
@@ -197,7 +196,7 @@ for (const [name, Command] of [["front", FrontCommand], ["back", BackCommand]] a
   test(`${name} retains its recovery record when undo fails and succeeds after target restoration`, () => {
     const { document, bus, source, target, first, last } = createScene(true);
     assert.ok(source);
-    bus.execute(new Command("target"));
+    bus.execute(new ReorderCommand("target", name));
     const detached = document.remove(target);
     assert.throws(() => bus.undo(), {
       name: "RangeError",
@@ -221,7 +220,7 @@ for (const [name, Command] of [["front", FrontCommand], ["back", BackCommand]] a
     document.add(b);
     const bus = new CommandBus(document);
     bus.execute(new DeleteCommand("a"));
-    bus.execute(new Command("b"));
+    bus.execute(new ReorderCommand("b", name));
     bus.undo();
     assert.deepEqual(document.topLevel(), [b]);
     bus.undo();
@@ -236,8 +235,8 @@ for (const [name, Command] of [["front", FrontCommand], ["back", BackCommand]] a
 test("structure commands reject duplicate execution and premature undo without losing original positions", () => {
   const cases = [
     { name: "addto", create: () => new AddToCommand("destination", "target") },
-    { name: "front", create: () => new FrontCommand("target") },
-    { name: "back", create: () => new BackCommand("target") },
+    { name: "front", create: () => new ReorderCommand("target", "front") },
+    { name: "back", create: () => new ReorderCommand("target", "back") },
   ];
   for (const { name, create } of cases) {
     const { document, source, target, first, last, destination, a, b } = createScene(true);
@@ -277,8 +276,8 @@ test("migration, sorting, and container deletion compose into a reversible multi
   });
   const commands = [
     new AddToCommand("destination", "target"),
-    new BackCommand("target"),
-    new FrontCommand("a"),
+    new ReorderCommand("target", "back"),
+    new ReorderCommand("a", "front"),
     new DeleteCommand("destination"),
   ];
   const states = [snapshot()];
@@ -308,7 +307,7 @@ test("migration, sorting, and container deletion compose into a reversible multi
 test("a rejected migration preserves redo while a successful migration starts a new history branch", () => {
   const { document, bus, source, target, first, last, destination, a, b } = createScene(true);
   assert.ok(source);
-  bus.execute(new BackCommand("target"));
+  bus.execute(new ReorderCommand("target", "back"));
   bus.undo();
   assert.throws(() => bus.execute(new AddToCommand("first", "target")), {
     message: "not a container: first",

@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EditorSession } from "../../src/application/EditorSession.js";
-import { CreateCommand } from "../../src/application/commands/CreateCommand.js";
-import { DeleteCommand } from "../../src/application/commands/DeleteCommand.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import { Tokenizer } from "../../src/cli/Tokenizer.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
@@ -10,10 +8,10 @@ import { RectShape } from "../../src/domain/shape/RectShape.js";
 function populatedSession() {
   const session = new EditorSession();
   session.init(400, 300);
-  const first = new RectShape("first", 10, 20, 30, 40);
-  const second = new RectShape("second", 0, 0, 10, 10);
-  session.execute(new CreateCommand(first));
-  session.execute(new CreateCommand(second));
+  session.createShape("rect", "first", ["10", "20", "30", "40"]);
+  session.createShape("rect", "second", ["0", "0", "10", "10"]);
+  const first = session.requireDocument().require("first");
+  const second = session.requireDocument().require("second");
   session.undo();
   return { session, registry: new CommandRegistry(session), first, second };
 }
@@ -41,6 +39,31 @@ function structureSession(nested: boolean) {
     destination: document.requireContainer("destination"),
   };
 }
+
+test("move dispatch validates parameters and rejected edits preserve redo", () => {
+  const { session, registry, first } = populatedSession();
+  const before = first.attributes();
+  const cases = [
+    { tokens: ["move"], message: "usage: move <id> <dx> <dy>" },
+    { tokens: ["move", "first", "1", "2", "3"], message: "usage: move <id> <dx> <dy>" },
+    { tokens: ["move", "first", "", "0"], message: "dx must be a finite number" },
+    { tokens: ["move", "first", "1", "Infinity"], message: "dy must be a finite number" },
+    { tokens: ["move", "missing", "1", "2"], message: "no such shape: missing" },
+  ];
+  for (const { tokens, message } of cases) {
+    assert.throws(() => registry.execute(tokens), { message });
+    assert.deepEqual(first.attributes(), before);
+  }
+  registry.execute(["redo"]);
+  assert.ok(session.requireDocument().find("second"));
+  assert.deepEqual(registry.execute(["move", "first", "1e1", "-0.5"]), {
+    kind: "message", text: "shape first moved by (10,-0.5)",
+  });
+  assert.equal(first.attributes().x, 20);
+  assert.equal(first.attributes().y, 19.5);
+  registry.execute(["undo"]);
+  assert.deepEqual(first.attributes(), before);
+});
 
 test("registry ignores empty input and rejects unknown or differently cased command names", () => {
   const session = new EditorSession();
@@ -169,7 +192,7 @@ test("canvas query preserves history while resizing clears both stacks without r
       message: "undo not allowed after io command",
     });
   }
-  session.execute(new DeleteCommand("first"));
+  session.deleteShape("first");
   assert.deepEqual(registry.execute(["undo"]), { kind: "message", text: "undo complete" });
   assert.strictEqual(document.require("first"), first);
   assert.throws(() => registry.execute(["undo"]), { message: "nothing to undo" });
@@ -184,8 +207,8 @@ test("registry init replaces the current document and binds later history to the
   registry.execute(["init", "200", "100"]);
   const document = session.requireDocument();
   assert.notStrictEqual(document, oldDocument);
-  const replacement = new RectShape("first", 0, 0, 10, 10);
-  session.execute(new CreateCommand(replacement));
+  session.createShape("rect", "first", ["0", "0", "10", "10"]);
+  const replacement = document.require("first");
   registry.execute(["undo"]);
   assert.deepEqual(document.topLevel(), []);
   assert.throws(() => registry.execute(["undo"]), { message: "nothing to undo" });

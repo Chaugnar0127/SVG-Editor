@@ -1,11 +1,11 @@
 import type {
-  DetachedSubtree,
+  ShapeLocation,
   SvgDocument,
 } from "../../domain/document/SvgDocument.js";
 import type { EditCommand } from "../CommandBus.js";
 
 export class AddToCommand implements EditCommand {
-  private previous: DetachedSubtree | undefined;
+  private previous: ShapeLocation | undefined;
 
   /** 参数顺序对应 addto <containerId> <id>。 */
   public constructor(

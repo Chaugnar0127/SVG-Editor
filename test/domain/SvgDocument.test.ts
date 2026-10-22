@@ -477,7 +477,7 @@ test("find returns the original root, nested group, and deeply nested leaf", () 
   const found = document.find("rect");
   assert.strictEqual(found, rect);
   assert.ok(found);
-  found.move(3, 4);
+  found.prepareMove(3, 4).apply();
   assert.deepEqual(rect.position, { x: 13, y: 24 });
 });
 
@@ -528,7 +528,7 @@ test("require returns original roots and descendants that can be edited directly
   const target = document.require("rect");
   assert.strictEqual(target, rect);
 
-  target.move(3, 4);
+  target.prepareMove(3, 4).apply();
 
   assert.deepEqual(rect.position, { x: 13, y: 24 });
   assert.deepEqual(document.topLevel(), [outer]);
@@ -634,7 +634,7 @@ test("remove finds a deep leaf after earlier branches and detaches it from its d
 
   assert.throws(() => document.remove(target), RangeError);
   assert.deepEqual(inner.children(), [first, last]);
-  outer.move(3, 4);
+  outer.prepareMove(3, 4).apply();
   assert.deepEqual(first.position, { x: 3, y: 4 });
   assert.deepEqual(last.position, { x: 3, y: 4 });
   assert.deepEqual(target.position, { x: 10, y: 20 });
@@ -972,9 +972,9 @@ test("moveTo transfers a whole subtree between groups and its returned location 
   assert.equal(redo.index, 1);
 
   document.moveTo(redo.shape, redo.parent, redo.index);
-  source.move(100, 100);
+  source.prepareMove(100, 100).apply();
   assert.deepEqual(leaf.position, { x: 10, y: 20 });
-  destination.move(3, 4);
+  destination.prepareMove(3, 4).apply();
   assert.deepEqual(leaf.position, { x: 13, y: 24 });
 });
 

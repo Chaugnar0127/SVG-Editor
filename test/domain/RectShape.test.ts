@@ -16,8 +16,8 @@ test("rectangle attributes are independent snapshots and omit unset fill", () =>
   Reflect.set(altered, "fill", "blue");
   Reflect.deleteProperty(altered, "width");
   assert.deepEqual(rect.attributes(), { x: 10, y: 20, width: 30, height: 40, fill: "red" });
-  rect.move(5, -5);
-  rect.scale(2);
+  rect.prepareMove(5, -5).apply();
+  rect.prepareScale(2).apply();
   assert.deepEqual(snapshot, { x: 10, y: 20, width: 30, height: 40, fill: "red" });
   assert.deepEqual(rect.attributes(), { x: 30, y: 30, width: 60, height: 80, fill: "red" });
 });
@@ -35,8 +35,8 @@ test("rectangle construction rejects non-finite coordinates through the domain A
 test("rectangle retains omitted or explicit fill through geometry changes and rejects blank fill", () => {
   for (const fill of [undefined, "none", "red", "rgb(10 20 30)"]) {
     const shape = new RectShape("shape", 10, 20, 30, 40, fill);
-    shape.move(5, -5);
-    shape.scale(2);
+    shape.prepareMove(5, -5).apply();
+    shape.prepareScale(2).apply();
     assert.equal(shape.fill, fill);
     assert.deepEqual(shape.position, { x: 30, y: 30 });
   }
@@ -50,7 +50,7 @@ test("rectangle retains omitted or explicit fill through geometry changes and re
 test("move changes position but preserves size", () => {
   const rect = new RectShape("r1", 10, 20, 100, 50);
 
-  rect.move(5, -3);
+  rect.prepareMove(5, -3).apply();
 
   assert.deepEqual(rect.position, { x: 15, y: 17 });
   assert.equal(rect.width, 100);
@@ -76,7 +76,7 @@ test("rejects non-positive or non-finite width and height", () => {
 test("scale changes position and dimensions proportionally", () => {
   const rect = new RectShape("r1", 10, 20, 100, 50);
 
-  rect.scale(2);
+  rect.prepareScale(2).apply();
 
   assert.deepEqual(rect.position, { x: 20, y: 40 });
   assert.equal(rect.width, 200);
@@ -88,7 +88,7 @@ test("rejects invalid scale factors without changing the rectangle", () => {
 
   for (const factor of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
     assert.throws(
-      () => rect.scale(factor),
+      () => rect.prepareScale(factor).apply(),
       { name: "RangeError", message: "scale factor must be positive" },
     );
   }

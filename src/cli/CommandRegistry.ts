@@ -1,4 +1,5 @@
 import type { EditorSession } from "../application/EditorSession.js";
+import { expectCount, numberAt } from "../application/arguments.js";
 import { Formatters } from "../presentation/Formatters.js";
 
 export type CommandResult =
@@ -22,10 +23,11 @@ export class CommandRegistry {
       ["back", (args) => this.back(args)],
       ["tree", (args) => this.tree(args)],
       ["show", (args) => this.show(args)],
+      ["move", (args) => this.move(args)],
       [
         "undo",
         (args) => {
-          this.expectCount(args, [0], "undo");
+          expectCount(args, [0], "undo");
           this.session.undo();
           return { kind: "message", text: "undo complete" };
         },
@@ -33,7 +35,7 @@ export class CommandRegistry {
       [
         "redo",
         (args) => {
-          this.expectCount(args, [0], "redo");
+          expectCount(args, [0], "redo");
           this.session.redo();
           return { kind: "message", text: "redo complete" };
         },
@@ -61,12 +63,12 @@ export class CommandRegistry {
   }
 
   private init(args: readonly string[]): CommandResult {
-    this.expectCount(args, [0, 1, 2], "init [width] [height]");
+    expectCount(args, [0, 1, 2], "init [width] [height]");
 
     const width =
-      args.length >= 1 ? this.numberAt(args, 0, "width") : undefined;
+      args.length >= 1 ? numberAt(args, 0, "width") : undefined;
     const height =
-      args.length >= 2 ? this.numberAt(args, 1, "height") : undefined;
+      args.length >= 2 ? numberAt(args, 1, "height") : undefined;
 
     this.session.init(width, height);
 
@@ -79,11 +81,11 @@ export class CommandRegistry {
   }
 
   private canvas(args: readonly string[]): CommandResult {
-    this.expectCount(args, [0, 2], "canvas [<width> <height>]");
+    expectCount(args, [0, 2], "canvas [<width> <height>]");
 
     if (args.length === 2) {
-      const width = this.numberAt(args, 0, "width");
-      const height = this.numberAt(args, 1, "height");
+      const width = numberAt(args, 0, "width");
+      const height = numberAt(args, 1, "height");
 
       this.session.resizeCanvas(width, height);
     }
@@ -131,13 +133,7 @@ export class CommandRegistry {
   }
 
   private deleteShape(args: readonly string[]): CommandResult {
-    this.expectCount(args, [1], "delete <id>");
-
-    const id = args[0];
-
-    if (id === undefined) {
-      throw new RangeError("usage: delete <id>");
-    }
+    const id = this.singleId(args, "delete <id>");
 
     this.session.deleteShape(id);
 
@@ -147,9 +143,29 @@ export class CommandRegistry {
     };
   }
 
+  private move(args: readonly string[]): CommandResult {
+    expectCount(args, [3], "move <id> <dx> <dy>");
+
+    const id = args[0];
+
+    if (id === undefined) {
+      throw new RangeError("usage: move <id> <dx> <dy>");
+    }
+
+    const dx = numberAt(args, 1, "dx");
+    const dy = numberAt(args, 2, "dy");
+
+    this.session.moveShape(id, dx, dy);
+
+    return {
+      kind: "message",
+      text: `shape ${id} moved by (${dx},${dy})`,
+    };
+  }
+
   private addTo(args: readonly string[]): CommandResult {
     const usage = "addto <containerId> <id>";
-    this.expectCount(args, [2], usage);
+    expectCount(args, [2], usage);
 
     const [containerId, id] = args;
 
@@ -166,16 +182,8 @@ export class CommandRegistry {
   }
 
   private front(args: readonly string[]): CommandResult {
-    const usage = "front <id>";
-    this.expectCount(args, [1], usage);
-
-    const id = args[0];
-
-    if (id === undefined) {
-      throw new RangeError(`usage: ${usage}`);
-    }
-
-    this.session.bringToFront(id);
+    const id = this.singleId(args, "front <id>");
+    this.session.reorderShape(id, "front");
 
     return {
       kind: "message",
@@ -184,16 +192,8 @@ export class CommandRegistry {
   }
 
   private back(args: readonly string[]): CommandResult {
-    const usage = "back <id>";
-    this.expectCount(args, [1], usage);
-
-    const id = args[0];
-
-    if (id === undefined) {
-      throw new RangeError(`usage: ${usage}`);
-    }
-
-    this.session.sendToBack(id);
+    const id = this.singleId(args, "back <id>");
+    this.session.reorderShape(id, "back");
 
     return {
       kind: "message",
@@ -202,7 +202,7 @@ export class CommandRegistry {
   }
 
   private tree(args: readonly string[]): CommandResult {
-    this.expectCount(args, [0, 1], "tree [id]");
+    expectCount(args, [0, 1], "tree [id]");
 
     const document = this.session.requireDocument();
 
@@ -213,14 +213,7 @@ export class CommandRegistry {
   }
 
   private show(args: readonly string[]): CommandResult {
-    this.expectCount(args, [1], "show <id>");
-
-    const id = args[0];
-
-    if (id === undefined) {
-      throw new RangeError("usage: show <id>");
-    }
-
+    const id = this.singleId(args, "show <id>");
     const document = this.session.requireDocument();
 
     return {
@@ -230,40 +223,19 @@ export class CommandRegistry {
   }
 
   private exit(args: readonly string[]): CommandResult {
-    this.expectCount(args, [0], "exit | quit");
+    expectCount(args, [0], "exit | quit");
 
     return { kind: "exit" };
   }
 
-  /** 参数个数不符合语法时，在调用会话之前拒绝执行。 */
-  private expectCount(
-    args: readonly string[],
-    allowed: readonly number[],
-    usage: string,
-  ): void {
-    if (!allowed.includes(args.length)) {
+  /** 校验单 ID 命令，并将数组索引收窄为必定存在的字符串。 */
+  private singleId(args: readonly string[], usage: string): string {
+    const id = args[0];
+
+    if (args.length !== 1 || id === undefined) {
       throw new RangeError(`usage: ${usage}`);
     }
-  }
 
-  /** 将完整参数转换为有限数；正数约束继续由领域模型检查。 */
-  private numberAt(
-    args: readonly string[],
-    index: number,
-    label: string,
-  ): number {
-    const raw = args[index];
-
-    if (raw === undefined || raw.trim().length === 0) {
-      throw new RangeError(`${label} must be a finite number`);
-    }
-
-    const value = Number(raw);
-
-    if (!Number.isFinite(value)) {
-      throw new RangeError(`${label} must be a finite number`);
-    }
-
-    return value;
+    return id;
   }
 }

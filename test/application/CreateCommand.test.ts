@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CommandBus } from "../../src/application/CommandBus.js";
 import { AddToCommand } from "../../src/application/commands/AddToCommand.js";
-import { BackCommand } from "../../src/application/commands/BackCommand.js";
+import { ReorderCommand } from "../../src/application/commands/ReorderCommand.js";
 import { CreateCommand } from "../../src/application/commands/CreateCommand.js";
 import { DeleteCommand } from "../../src/application/commands/DeleteCommand.js";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
@@ -202,7 +202,7 @@ test("creation, migration, ordering and deletion each remain one reversible hist
     new CreateCommand(destination),
     new CreateCommand(other, "destination"),
     new AddToCommand("destination", "leaf"),
-    new BackCommand("leaf"),
+    new ReorderCommand("leaf", "back"),
     new DeleteCommand("destination"),
   ];
   const expected = [

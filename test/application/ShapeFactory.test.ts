@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ShapeFactory } from "../../src/domain/factory/ShapeFactory.js";
+import { ShapeFactory } from "../../src/application/ShapeFactory.js";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 

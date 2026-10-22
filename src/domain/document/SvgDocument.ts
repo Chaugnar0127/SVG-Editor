@@ -1,8 +1,8 @@
 import type { Shape } from "../shape/Shape.js";
 import { GroupShape } from "../shape/GroupShape.js";
 
-/** 保存摘下的原子树及其原位置，供撤销删除时恢复。 */
-export interface DetachedSubtree {
+/** 原图形及其所在位置的记录，供删除、迁移和排序撤销使用。 */
+export interface ShapeLocation {
   readonly shape: Shape;
   readonly parent: GroupShape | null;
   readonly index: number;
@@ -136,7 +136,7 @@ export class SvgDocument {
    * 摘下文档中的原图形，保留其子树并返回原父容器和下标。
    * 目标对象不属于本文档时抛出 RangeError，不修改文档。
    */
-  public remove(shape: Shape): DetachedSubtree {
+  public remove(shape: Shape): ShapeLocation {
     const location = this.locate(shape);
 
     if (location.parent === null) {
@@ -152,7 +152,7 @@ export class SvgDocument {
    * 按记录将原子树放回指定父容器和下标。
    * 插入规则统一由 add 校验。
    */
-  public restore(detached: DetachedSubtree): void {
+  public restore(detached: ShapeLocation): void {
     this.add(detached.shape, detached.parent, detached.index);
   }
 
@@ -165,7 +165,7 @@ export class SvgDocument {
     shape: Shape,
     parent: GroupShape | null,
     index?: number,
-  ): DetachedSubtree {
+  ): ShapeLocation {
     if (this.find(shape.id) !== shape) {
       throw new RangeError(`no such shape: ${shape.id}`);
     }
@@ -206,7 +206,7 @@ export class SvgDocument {
    * 将图形移到当前父容器的末尾，对应最前面的绘制层级。
    * 返回原位置记录，供撤销时恢复。
    */
-  public bringToFront(shape: Shape): DetachedSubtree {
+  public bringToFront(shape: Shape): ShapeLocation {
     const { parent } = this.locate(shape);
 
     return this.moveTo(shape, parent);
@@ -216,7 +216,7 @@ export class SvgDocument {
    * 将图形移到当前父容器的开头，对应最后面的绘制层级。
    * 返回原位置记录，供撤销时恢复。
    */
-  public sendToBack(shape: Shape): DetachedSubtree {
+  public sendToBack(shape: Shape): ShapeLocation {
     const { parent } = this.locate(shape);
 
     return this.moveTo(shape, parent, 0);
@@ -226,11 +226,11 @@ export class SvgDocument {
    * 查找原图形的直接父容器和同级下标，不修改文档。
    * 目标对象不属于本文档时抛出 RangeError。
    */
-  private locate(shape: Shape): DetachedSubtree {
+  private locate(shape: Shape): ShapeLocation {
     const search = (
       siblings: readonly Shape[],
       parent: GroupShape | null,
-    ): DetachedSubtree | undefined => {
+    ): ShapeLocation | undefined => {
       for (const [index, candidate] of siblings.entries()) {
         if (candidate === shape) {
           return { shape: candidate, parent, index };

@@ -21,6 +21,40 @@ function runCli(input: string): string[] {
   return result.stdout.replaceAll("svg> ", "").trim().split(/\r?\n/u);
 }
 
+test("CLI moves a group atomically, shows current geometry and restores one-step history", () => {
+  assert.deepEqual(runCli([
+    "init",
+    "create g scene",
+    "create rect a 1 2 3 4 in scene",
+    "create rect b 1e308 0 3 4 in scene",
+    "move scene 5 -3",
+    "show a",
+    "undo",
+    "move scene 1e308 0",
+    "show a",
+    "redo",
+    "show a",
+    "quit",
+    "",
+  ].join("\n")), [
+    "svg-editor 0.1",
+    "canvas 800x600 created",
+    "g#scene created",
+    "rect#a created in g#scene",
+    "rect#b created in g#scene",
+    "shape scene moved by (5,-3)",
+    "rect#a  parent=g#scene",
+    "  x=6", "  y=-1", "  width=3", "  height=4",
+    "undo complete",
+    "error: moved rectangle coordinates must remain finite",
+    "rect#a  parent=g#scene",
+    "  x=1", "  y=2", "  width=3", "  height=4",
+    "redo complete",
+    "rect#a  parent=g#scene",
+    "  x=6", "  y=-1", "  width=3", "  height=4",
+  ]);
+});
+
 test("CLI runs document commands and continues after lookup, arity, numeric and quoting errors", () => {
   const output = runCli([
     "",

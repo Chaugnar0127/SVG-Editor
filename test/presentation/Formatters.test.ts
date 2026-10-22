@@ -80,7 +80,7 @@ test("formatters reflect current geometry, parent, order and canvas size without
     "    └── rect#a  x=-1.5 y=2 w=3 h=4 fill=red",
   ].join("\n"));
   document.moveTo(a, empty);
-  a.move(2, -1);
+  a.prepareMove(2, -1).apply();
   assert.equal(formatters.show(document, "a"), [
     "rect#a  parent=g#empty", "  x=0.5", "  y=1", "  width=3", "  height=4", "  fill=red",
   ].join("\n"));
@@ -100,8 +100,8 @@ test("formatters escape whitespace, quotes and backslashes and consume any Shape
       quote: 'a"b', slash: "a\\b", newline: "a\nb", empty: "",
     }),
     children: () => [],
-    move: () => { throw new Error("display must not move a shape"); },
-    scale: () => { throw new Error("display must not scale a shape"); },
+    prepareMove: () => { throw new Error("display must not move a shape"); },
+    prepareScale: () => { throw new Error("display must not scale a shape"); },
   };
   document.add(custom);
   const pairs = [

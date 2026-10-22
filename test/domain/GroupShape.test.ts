@@ -23,8 +23,8 @@ test("group stores children and delegates move and scale", () => {
   const rect = new RectShape("r1", 10, 20, 100, 50);
 
   group.add(rect);
-  group.move(5, -3);
-  group.scale(2);
+  group.prepareMove(5, -3).apply();
+  group.prepareScale(2).apply();
 
   assert.deepEqual(group.children().map((child) => child.id), ["r1"]);
   assert.deepEqual(rect.position, { x: 30, y: 34 });
@@ -39,7 +39,7 @@ test("group rejects invalid scale factors before changing children", () => {
   group.add(rect);
 
   assert.throws(
-    () => group.scale(0),
+    () => group.prepareScale(0).apply(),
     { name: "RangeError", message: "scale factor must be positive" },
   );
 
@@ -72,8 +72,8 @@ test("nested groups transform every descendant and preserve sibling order", () =
   outer.add(inner);
   outer.add(siblingRect);
 
-  outer.move(5, -3);
-  outer.scale(2);
+  outer.prepareMove(5, -3).apply();
+  outer.prepareScale(2).apply();
 
   assert.deepEqual(nestedRect.position, { x: 30, y: 34 });
   assert.equal(nestedRect.width, 200);
@@ -96,7 +96,7 @@ test("changing the returned children array cannot bypass group membership rules"
 
   assert.deepEqual(group.children(), [rect]);
 
-  group.move(3, 4);
+  group.prepareMove(3, 4).apply();
   assert.deepEqual(rect.position, { x: 3, y: 4 });
 });
 
@@ -112,7 +112,7 @@ test("remove returns the original child and preserves the order of remaining sib
   assert.strictEqual(group.remove("middle"), middle);
   assert.deepEqual(group.children(), [first, last]);
 
-  group.move(3, 4);
+  group.prepareMove(3, 4).apply();
   assert.deepEqual(first.position, { x: 3, y: 4 });
   assert.deepEqual(last.position, { x: 43, y: 54 });
   assert.deepEqual(middle.position, { x: 20, y: 30 });
@@ -154,9 +154,9 @@ test("remove only accepts direct children and preserves a detached subtree for t
   assert.deepEqual(source.children(), []);
 
   destination.add(removed);
-  source.move(100, 100);
+  source.prepareMove(100, 100).apply();
   assert.deepEqual(rect.position, { x: 10, y: 20 });
-  destination.move(3, 4);
+  destination.prepareMove(3, 4).apply();
   assert.deepEqual(rect.position, { x: 13, y: 24 });
 });
 
@@ -244,6 +244,6 @@ test("indexed insertion rejects an ancestor several levels up without changing e
   assert.deepEqual(middle.children(), [inner]);
   assert.deepEqual(inner.children(), [rect]);
 
-  outer.move(3, 4);
+  outer.prepareMove(3, 4).apply();
   assert.deepEqual(rect.position, { x: 13, y: 24 });
 });

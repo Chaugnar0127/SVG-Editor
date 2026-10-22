@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EditorSession } from "../../src/application/EditorSession.js";
-import { CreateCommand } from "../../src/application/commands/CreateCommand.js";
-import { DeleteCommand } from "../../src/application/commands/DeleteCommand.js";
-import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
+
+function createRect(session: EditorSession, id: string, x: number, y: number, width: number, height: number): RectShape {
+  session.createShape("rect", id, [x, y, width, height].map(String));
+  const shape = session.requireDocument().require(id);
+  assert.ok(shape instanceof RectShape);
+  return shape;
+}
 
 function assertHistoryLocked(session: EditorSession): void {
   const error = {
@@ -15,20 +19,18 @@ function assertHistoryLocked(session: EditorSession): void {
   assert.throws(() => session.redo(), error);
 }
 
-test("an uninitialized session rejects document operations without consuming the edit command", () => {
+test("an uninitialized session rejects document operations and allows initialization afterwards", () => {
   const session = new EditorSession();
-  const shape = new RectShape("shape", 10, 20, 30, 40);
-  const command = new CreateCommand(shape);
   const operations = [
     () => session.requireDocument(),
     () => session.resizeCanvas(400, 300),
-    () => session.execute(command),
+    () => session.moveShape("shape", 1, 2),
     () => session.createShape("g", "group", []),
     () => session.createShape("unknown", "", []),
     () => session.deleteShape("shape"),
     () => session.addTo("group", "shape"),
-    () => session.bringToFront("shape"),
-    () => session.sendToBack("shape"),
+    () => session.reorderShape("shape", "front"),
+    () => session.reorderShape("shape", "back"),
     () => session.undo(),
     () => session.redo(),
   ];
@@ -44,7 +46,7 @@ test("an uninitialized session rejects document operations without consuming the
   });
 
   session.init();
-  session.execute(command);
+  const shape = createRect(session, "shape", 10, 20, 30, 40);
   assert.strictEqual(session.requireDocument().require("shape"), shape);
   session.undo();
   assert.deepEqual(session.requireDocument().topLevel(), []);
@@ -72,10 +74,8 @@ test("failed reinitialization preserves the original document and both undo and 
   const session = new EditorSession();
   session.init(400, 300);
   const document = session.requireDocument();
-  const first = new RectShape("first", 10, 20, 30, 40);
-  const second = new RectShape("second", 0, 0, 10, 10);
-  session.execute(new CreateCommand(first));
-  session.execute(new CreateCommand(second));
+  const first = createRect(session, "first", 10, 20, 30, 40);
+  const second = createRect(session, "second", 0, 0, 10, 10);
   session.undo();
 
   for (const invalid of [0, -1, NaN, Infinity, -Infinity]) {
@@ -100,10 +100,8 @@ test("successful reinitialization replaces the document and never revives old hi
   const session = new EditorSession();
   session.init();
   const oldDocument = session.requireDocument();
-  const oldShape = new RectShape("shape", 10, 20, 30, 40);
-  const undoneShape = new RectShape("undone", 0, 0, 10, 10);
-  session.execute(new CreateCommand(oldShape));
-  session.execute(new CreateCommand(undoneShape));
+  const oldShape = createRect(session, "shape", 10, 20, 30, 40);
+  createRect(session, "undone", 0, 0, 10, 10);
   session.undo();
 
   session.init(640, 480);
@@ -113,11 +111,10 @@ test("successful reinitialization replaces the document and never revives old hi
   assert.equal(document.width, 640);
   assert.equal(document.height, 480);
   assertHistoryLocked(session);
-  assert.throws(() => session.execute(new DeleteCommand("missing")), RangeError);
+  assert.throws(() => session.deleteShape("missing"), RangeError);
   assertHistoryLocked(session);
 
-  const replacement = new RectShape("shape", 50, 60, 70, 80);
-  session.execute(new CreateCommand(replacement));
+  const replacement = createRect(session, "shape", 50, 60, 70, 80);
   assert.strictEqual(document.require("shape"), replacement);
   session.undo();
   assert.deepEqual(document.topLevel(), []);
@@ -134,11 +131,12 @@ test("successful canvas resize keeps the tree but clears both histories until a 
   const session = new EditorSession();
   session.init(400, 300);
   const document = session.requireDocument();
-  const group = new GroupShape("group");
-  const leaf = new RectShape("leaf", 10, 20, 30, 40);
-  group.add(leaf);
-  session.execute(new CreateCommand(group));
-  session.execute(new DeleteCommand("leaf"));
+  session.createShape("g", "group", []);
+  session.createShape("rect", "leaf", ["10", "20", "30", "40"], "group");
+  const group = document.requireContainer("group");
+  const leaf = document.require("leaf");
+  assert.ok(leaf instanceof RectShape);
+  session.deleteShape("leaf");
   session.undo();
 
   session.resizeCanvas(640.5, 480.25);
@@ -148,13 +146,12 @@ test("successful canvas resize keeps the tree but clears both histories until a 
   assert.strictEqual(document.require("group"), group);
   assert.strictEqual(document.require("leaf"), leaf);
   assertHistoryLocked(session);
-  assert.throws(() => session.execute(new CreateCommand(
-    new RectShape("leaf", 0, 0, 10, 10),
-  )), { message: "id already exists: leaf" });
+  assert.throws(() => session.createShape("rect", "leaf", ["0", "0", "10", "10"]), {
+    message: "id already exists: leaf",
+  });
   assertHistoryLocked(session);
 
-  const next = new RectShape("next", 0, 0, 10, 10);
-  session.execute(new CreateCommand(next));
+  const next = createRect(session, "next", 0, 0, 10, 10);
   session.undo();
   assert.deepEqual(document.topLevel(), [group]);
   assert.throws(() => session.undo(), { message: "nothing to undo" });
@@ -171,10 +168,8 @@ test("failed canvas resize preserves both dimensions, both histories and the cur
   const session = new EditorSession();
   session.init(400, 300);
   const document = session.requireDocument();
-  const first = new RectShape("first", 0, 0, 10, 10);
-  const second = new RectShape("second", 0, 0, 10, 10);
-  session.execute(new CreateCommand(first));
-  session.execute(new CreateCommand(second));
+  const first = createRect(session, "first", 0, 0, 10, 10);
+  const second = createRect(session, "second", 0, 0, 10, 10);
   session.undo();
 
   for (const invalid of [0, -1, NaN, Infinity, -Infinity]) {
@@ -205,16 +200,16 @@ test("queries and failed document operations preserve an existing history lock",
   assert.throws(() => session.createShape("rect", "bad", ["0", "0", "0", "10"]), RangeError);
   assert.throws(() => session.createShape("g", "bad", [], "missing"), RangeError);
   assert.throws(() => session.deleteShape("missing"), RangeError);
+  assert.throws(() => session.moveShape("missing", 1, 2), RangeError);
   assert.throws(() => session.addTo("missing", "missing"), RangeError);
-  assert.throws(() => session.bringToFront("missing"), RangeError);
-  assert.throws(() => session.sendToBack("missing"), RangeError);
+  assert.throws(() => session.reorderShape("missing", "front"), RangeError);
+  assert.throws(() => session.reorderShape("missing", "back"), RangeError);
   assert.strictEqual(session.requireDocument(), document);
   assert.equal(document.width, 400);
   assert.equal(document.height, 300);
   assertHistoryLocked(session);
 
-  const shape = new RectShape("shape", 0, 0, 10, 10);
-  session.execute(new CreateCommand(shape));
+  const shape = createRect(session, "shape", 0, 0, 10, 10);
   assert.strictEqual(session.requireDocument().require("shape"), shape);
   session.undo();
   assert.deepEqual(session.requireDocument().topLevel(), []);
@@ -228,10 +223,8 @@ test("sessions with identical IDs keep document replacement, canvas changes and 
   const second = new EditorSession();
   first.init(400, 300);
   second.init(200, 100);
-  const firstShape = new RectShape("shape", 10, 20, 30, 40);
-  const secondShape = new RectShape("shape", 50, 60, 70, 80);
-  first.execute(new CreateCommand(firstShape));
-  second.execute(new CreateCommand(secondShape));
+  createRect(first, "shape", 10, 20, 30, 40);
+  const secondShape = createRect(second, "shape", 50, 60, 70, 80);
   const secondDocument = second.requireDocument();
 
   first.resizeCanvas(800, 600);

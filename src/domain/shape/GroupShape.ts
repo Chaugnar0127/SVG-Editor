@@ -1,4 +1,4 @@
-import type { Shape, ShapeAttributes } from "./Shape.js";
+import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
 
 export class GroupShape implements Shape {
   public readonly type = "g";
@@ -64,33 +64,49 @@ export class GroupShape implements Shape {
     return child;
   }
 
-  /** 按对象身份检查子树是否包含目标，用于阻止把祖先放进后代形成环。 */
+  /** 汇集直接子节点的变更，嵌套组通过相同接口递归准备。 */
+  public prepareMove(dx: number, dy: number): GeometryChange {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+      throw new RangeError("move offsets must be finite numbers");
+    }
+
+    return this.combineChanges(
+      this.childShapes.map((child) => child.prepareMove(dx, dy)),
+    );
+  }
+
+  /** 全部后代准备成功才返回可提交的整组缩放。 */
+  public prepareScale(factor: number): GeometryChange {
+    if (!Number.isFinite(factor) || factor <= 0) {
+      throw new RangeError("scale factor must be positive");
+    }
+
+    return this.combineChanges(
+      this.childShapes.map((child) => child.prepareScale(factor)),
+    );
+  }
+
+  private combineChanges(changes: readonly GeometryChange[]): GeometryChange {
+    return {
+      apply: () => {
+        for (const change of changes) {
+          change.apply();
+        }
+      },
+      undo: () => {
+        for (const change of changes) {
+          change.undo();
+        }
+      },
+    };
+  }
+
+  /** 按对象身份检查子树是否包含目标，阻止祖先环。 */
   private containsShape(root: Shape, target: Shape): boolean {
     if (root === target) {
       return true;
     }
 
     return root.children().some((child) => this.containsShape(child, target));
-  }
-
-  /** 向直接子节点转发平移，嵌套组通过相同接口递归移动全部后代。 */
-  public move(dx: number, dy: number): void {
-    for (const child of this.childShapes) {
-      child.move(dx, dy);
-    }
-  }
-
-  /**
-   * 校验倍率后向子节点转发缩放，使后代的位置和尺寸一起变化。
-   * 当前子节点若中途抛错，已经完成的变换不会自动回滚。
-   */
-  public scale(factor: number): void {
-    if (!Number.isFinite(factor) || factor <= 0) {
-      throw new RangeError("scale factor must be positive");
-    }
-
-    for (const child of this.childShapes) {
-      child.scale(factor);
-    }
   }
 }

@@ -1,4 +1,4 @@
-import type { Shape, ShapeAttributes } from "./Shape.js";
+import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
 
 export class RectShape implements Shape {
   public readonly type = "rect";
@@ -66,35 +66,79 @@ export class RectShape implements Shape {
   }
 
   /**
-   * 以坐标原点为基准，同时缩放位置与宽高。
-   * 非法倍率或宽高计算结果非有限时，在修改字段前抛出 RangeError。
+   * 准备以原点为基准的位置与尺寸缩放，拒绝溢出及尺寸下溢到零。
    */
-  public scale(factor: number): void {
+  public prepareScale(factor: number): GeometryChange {
     if (!Number.isFinite(factor) || factor <= 0) {
       throw new RangeError("scale factor must be positive");
     }
 
     const nextWidth = this.widthValue * factor;
     const nextHeight = this.heightValue * factor;
+    const nextX = this.x * factor;
+    const nextY = this.y * factor;
 
     if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight)) {
       throw new RangeError("scaled rectangle dimensions must remain finite");
     }
 
-    this.x *= factor;
-    this.y *= factor;
-    this.widthValue = nextWidth;
-    this.heightValue = nextHeight;
+    if (nextWidth <= 0 || nextHeight <= 0) {
+      throw new RangeError("scaled rectangle dimensions must remain positive");
+    }
+
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+      throw new RangeError("scaled rectangle coordinates must remain finite");
+    }
+
+    return this.geometryChange(nextX, nextY, nextWidth, nextHeight);
   }
 
-  /** 按增量平移左上角，宽高保持不变。 */
-  public move(dx: number, dy: number): void {
-    this.x += dx;
-    this.y += dy;
+  /** 保存原坐标和目标坐标，准备过程不改变矩形。 */
+  public prepareMove(dx: number, dy: number): GeometryChange {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+      throw new RangeError("move offsets must be finite numbers");
+    }
+
+    const nextX = this.x + dx;
+    const nextY = this.y + dy;
+
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+      throw new RangeError("moved rectangle coordinates must remain finite");
+    }
+
+    return this.geometryChange(nextX, nextY, this.widthValue, this.heightValue);
   }
 
-  /** 矩形是叶子节点，没有子节点；返回空数组以支持统一的树遍历。 */
+  /** 矩形是叶子节点，没有子节点。 */
   public children(): readonly Shape[] {
     return [];
+  }
+
+  /** 平移与缩放共用精确恢复逻辑；传入值已由准备方法完成校验。 */
+  private geometryChange(
+    nextX: number,
+    nextY: number,
+    nextWidth: number,
+    nextHeight: number,
+  ): GeometryChange {
+    const previousX = this.x;
+    const previousY = this.y;
+    const previousWidth = this.widthValue;
+    const previousHeight = this.heightValue;
+
+    return {
+      apply: () => {
+        this.x = nextX;
+        this.y = nextY;
+        this.widthValue = nextWidth;
+        this.heightValue = nextHeight;
+      },
+      undo: () => {
+        this.x = previousX;
+        this.y = previousY;
+        this.widthValue = previousWidth;
+        this.heightValue = previousHeight;
+      },
+    };
   }
 }

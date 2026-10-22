@@ -1,11 +1,11 @@
 import type {
-  DetachedSubtree,
+  ShapeLocation,
   SvgDocument,
 } from "../../domain/document/SvgDocument.js";
 import type { EditCommand } from "../CommandBus.js";
 
 export class DeleteCommand implements EditCommand {
-  private detached: DetachedSubtree | undefined;
+  private detached: ShapeLocation | undefined;
 
   /** 每次新的删除请求创建一个命令实例，保存目标 ID。 */
   public constructor(private readonly id: string) {}
