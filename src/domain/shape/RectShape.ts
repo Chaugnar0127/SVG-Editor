@@ -1,23 +1,33 @@
-import type { Shape } from "./Shape.js";
+import type { Shape, ShapeAttributes } from "./Shape.js";
 
 export class RectShape implements Shape {
+  public readonly type = "rect";
   private widthValue: number;
   private heightValue: number;
 
-  /** 以左上角坐标和宽高创建矩形；宽高必须为正的有限数。 */
+  /** 创建矩形；坐标必须有限，宽高必须为正的有限数。 */
   public constructor(
     public readonly id: string,
     private x: number,
     private y: number,
     width: number,
     height: number,
+    private fillValue?: string,
   ) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new RangeError("rectangle coordinates must be finite numbers");
+    }
+
     if (!Number.isFinite(width) || width <= 0) {
       throw new RangeError("rectangle width must be a positive finite number");
     }
 
     if (!Number.isFinite(height) || height <= 0) {
       throw new RangeError("rectangle height must be a positive finite number");
+    }
+
+    if (fillValue !== undefined && fillValue.trim().length === 0) {
+      throw new RangeError("fill must not be empty");
     }
 
     this.widthValue = width;
@@ -37,6 +47,22 @@ export class RectShape implements Shape {
   /** 读取当前高度，外部不能通过此属性直接赋值。 */
   public get height(): number {
     return this.heightValue;
+  }
+
+  /** undefined 表示未显式指定填充色。 */
+  public get fill(): string | undefined {
+    return this.fillValue;
+  }
+
+  /** 返回独立属性副本；未设置的 fill 不出现在结果中。 */
+  public attributes(): ShapeAttributes {
+    return {
+      x: this.x,
+      y: this.y,
+      width: this.widthValue,
+      height: this.heightValue,
+      ...(this.fillValue === undefined ? {} : { fill: this.fillValue }),
+    };
   }
 
   /**

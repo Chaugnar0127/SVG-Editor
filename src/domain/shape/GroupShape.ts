@@ -1,10 +1,16 @@
-import type { Shape } from "./Shape.js";
+import type { Shape, ShapeAttributes } from "./Shape.js";
 
 export class GroupShape implements Shape {
+  public readonly type = "g";
   private readonly childShapes: Shape[] = [];
 
   /** 创建具有指定 ID 的空组。 */
   public constructor(public readonly id: string) {}
+
+  /** 组没有独立几何或样式属性。 */
+  public attributes(): ShapeAttributes {
+    return {};
+  }
 
   /** 返回直接子节点数组的副本，避免外部绕过 add/remove 改变成员关系。 */
   public children(): readonly Shape[] {

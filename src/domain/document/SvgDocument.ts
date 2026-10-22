@@ -77,6 +77,11 @@ export class SvgDocument {
     return shape;
   }
 
+  /** 查询原图形的直接父容器；顶层图形返回 null。 */
+  public parentOf(shape: Shape): GroupShape | null {
+    return this.locate(shape).parent;
+  }
+
   /** 获取必须存在的组，区分目标不存在和目标不是容器两种错误。 */
   public requireContainer(id: string): GroupShape {
     const shape = this.find(id);

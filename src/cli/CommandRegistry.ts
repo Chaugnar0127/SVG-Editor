@@ -1,4 +1,5 @@
 import type { EditorSession } from "../application/EditorSession.js";
+import { Formatters } from "../presentation/Formatters.js";
 
 export type CommandResult =
   | { readonly kind: "message"; readonly text: string }
@@ -7,12 +8,20 @@ export type CommandResult =
 type CommandHandler = (args: readonly string[]) => CommandResult;
 
 export class CommandRegistry {
+  private readonly formatters = new Formatters();
   private readonly handlers: ReadonlyMap<string, CommandHandler>;
 
   public constructor(private readonly session: EditorSession) {
     this.handlers = new Map<string, CommandHandler>([
       ["init", (args) => this.init(args)],
       ["canvas", (args) => this.canvas(args)],
+      ["create", (args) => this.create(args)],
+      ["delete", (args) => this.deleteShape(args)],
+      ["addto", (args) => this.addTo(args)],
+      ["front", (args) => this.front(args)],
+      ["back", (args) => this.back(args)],
+      ["tree", (args) => this.tree(args)],
+      ["show", (args) => this.show(args)],
       [
         "undo",
         (args) => {
@@ -84,6 +93,139 @@ export class CommandRegistry {
     return {
       kind: "message",
       text: `canvas ${document.width}x${document.height}`,
+    };
+  }
+
+  private create(args: readonly string[]): CommandResult {
+    const usage = "create <type> <id> [params...] [in <containerId>]";
+    const [type, id] = args;
+
+    if (type === undefined || id === undefined) {
+      throw new RangeError(`usage: ${usage}`);
+    }
+
+    let parameters = args.slice(2);
+    let containerId: string | undefined;
+
+    if (parameters.length >= 2 && parameters.at(-2) === "in") {
+      const target = parameters.at(-1);
+
+      if (target === undefined || target.length === 0 || /\s/u.test(target)) {
+        throw new RangeError(`usage: ${usage}`);
+      }
+
+      containerId = target;
+      parameters = parameters.slice(0, -2);
+    } else if (parameters.at(-1) === "in") {
+      throw new RangeError(`usage: ${usage}`);
+    }
+
+    this.session.createShape(type, id, parameters, containerId);
+
+    const suffix = containerId === undefined ? "" : ` in g#${containerId}`;
+
+    return {
+      kind: "message",
+      text: `${type}#${id} created${suffix}`,
+    };
+  }
+
+  private deleteShape(args: readonly string[]): CommandResult {
+    this.expectCount(args, [1], "delete <id>");
+
+    const id = args[0];
+
+    if (id === undefined) {
+      throw new RangeError("usage: delete <id>");
+    }
+
+    this.session.deleteShape(id);
+
+    return {
+      kind: "message",
+      text: `shape ${id} deleted`,
+    };
+  }
+
+  private addTo(args: readonly string[]): CommandResult {
+    const usage = "addto <containerId> <id>";
+    this.expectCount(args, [2], usage);
+
+    const [containerId, id] = args;
+
+    if (containerId === undefined || id === undefined) {
+      throw new RangeError(`usage: ${usage}`);
+    }
+
+    this.session.addTo(containerId, id);
+
+    return {
+      kind: "message",
+      text: `shape ${id} moved into g#${containerId}`,
+    };
+  }
+
+  private front(args: readonly string[]): CommandResult {
+    const usage = "front <id>";
+    this.expectCount(args, [1], usage);
+
+    const id = args[0];
+
+    if (id === undefined) {
+      throw new RangeError(`usage: ${usage}`);
+    }
+
+    this.session.bringToFront(id);
+
+    return {
+      kind: "message",
+      text: `shape ${id} brought to front`,
+    };
+  }
+
+  private back(args: readonly string[]): CommandResult {
+    const usage = "back <id>";
+    this.expectCount(args, [1], usage);
+
+    const id = args[0];
+
+    if (id === undefined) {
+      throw new RangeError(`usage: ${usage}`);
+    }
+
+    this.session.sendToBack(id);
+
+    return {
+      kind: "message",
+      text: `shape ${id} sent to back`,
+    };
+  }
+
+  private tree(args: readonly string[]): CommandResult {
+    this.expectCount(args, [0, 1], "tree [id]");
+
+    const document = this.session.requireDocument();
+
+    return {
+      kind: "message",
+      text: this.formatters.tree(document, args[0]),
+    };
+  }
+
+  private show(args: readonly string[]): CommandResult {
+    this.expectCount(args, [1], "show <id>");
+
+    const id = args[0];
+
+    if (id === undefined) {
+      throw new RangeError("usage: show <id>");
+    }
+
+    const document = this.session.requireDocument();
+
+    return {
+      kind: "message",
+      text: this.formatters.show(document, id),
     };
   }
 
