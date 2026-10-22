@@ -4,6 +4,44 @@ import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 
+test("parentOf follows current membership by identity across migration, removal and restoration", () => {
+  const document = new SvgDocument();
+  const early = new GroupShape("early");
+  const outer = new GroupShape("outer");
+  const inner = new GroupShape("inner");
+  const leaf = new RectShape("leaf", 0, 0, 10, 10);
+  inner.add(leaf);
+  outer.add(inner);
+  document.add(early);
+  document.add(outer);
+  assert.equal(document.parentOf(outer), null);
+  assert.strictEqual(document.parentOf(inner), outer);
+  assert.strictEqual(document.parentOf(leaf), inner);
+  const original = document.moveTo(leaf, early);
+  assert.strictEqual(document.parentOf(leaf), early);
+  document.moveTo(leaf, original.parent, original.index);
+  assert.strictEqual(document.parentOf(leaf), inner);
+
+  const foreignDocument = new SvgDocument();
+  const foreignLeaf = new RectShape("leaf", 0, 0, 10, 10);
+  foreignDocument.add(foreignLeaf);
+  for (const candidate of [foreignLeaf, new GroupShape("outer"), new GroupShape("absent")]) {
+    assert.throws(() => document.parentOf(candidate), {
+      name: "RangeError", message: `no such shape: ${candidate.id}`,
+    });
+  }
+  const detached = document.remove(outer);
+  for (const candidate of [outer, inner, leaf]) {
+    assert.throws(() => document.parentOf(candidate), { message: `no such shape: ${candidate.id}` });
+  }
+  document.restore(detached);
+  assert.deepEqual(document.topLevel(), [early, outer]);
+  assert.deepEqual(early.children(), []);
+  assert.deepEqual(outer.children(), [inner]);
+  assert.deepEqual(inner.children(), [leaf]);
+  assert.strictEqual(document.parentOf(leaf), inner);
+});
+
 test("requireContainer returns original groups at any depth and distinguishes lookup errors", () => {
   const document = new SvgDocument();
   const outer = new GroupShape("outer");

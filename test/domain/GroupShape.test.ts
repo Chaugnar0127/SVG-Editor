@@ -3,6 +3,21 @@ import test from "node:test";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 
+test("group attributes are independent from each other and from child geometry", () => {
+  const group = new GroupShape("group");
+  const child = new RectShape("child", 10, 20, 30, 40, "red");
+  group.add(child);
+  assert.equal(group.type, "g");
+  const attributes = group.attributes();
+  assert.notStrictEqual(attributes, group.attributes());
+  Reflect.set(attributes, "x", 999);
+  Reflect.set(attributes, "fill", "blue");
+  assert.deepEqual(group.attributes(), {});
+  assert.deepEqual(group.children(), [child]);
+  assert.deepEqual(child.position, { x: 10, y: 20 });
+  assert.equal(child.fill, "red");
+});
+
 test("group stores children and delegates move and scale", () => {
   const group = new GroupShape("g1");
   const rect = new RectShape("r1", 10, 20, 100, 50);

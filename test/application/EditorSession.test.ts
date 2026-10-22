@@ -23,6 +23,12 @@ test("an uninitialized session rejects document operations without consuming the
     () => session.requireDocument(),
     () => session.resizeCanvas(400, 300),
     () => session.execute(command),
+    () => session.createShape("g", "group", []),
+    () => session.createShape("unknown", "", []),
+    () => session.deleteShape("shape"),
+    () => session.addTo("group", "shape"),
+    () => session.bringToFront("shape"),
+    () => session.sendToBack("shape"),
     () => session.undo(),
     () => session.redo(),
   ];
@@ -196,6 +202,12 @@ test("queries and failed document operations preserve an existing history lock",
   assertHistoryLocked(session);
   assert.throws(() => session.init(1000, 0), RangeError);
   assert.throws(() => session.resizeCanvas(1000, 0), RangeError);
+  assert.throws(() => session.createShape("rect", "bad", ["0", "0", "0", "10"]), RangeError);
+  assert.throws(() => session.createShape("g", "bad", [], "missing"), RangeError);
+  assert.throws(() => session.deleteShape("missing"), RangeError);
+  assert.throws(() => session.addTo("missing", "missing"), RangeError);
+  assert.throws(() => session.bringToFront("missing"), RangeError);
+  assert.throws(() => session.sendToBack("missing"), RangeError);
   assert.strictEqual(session.requireDocument(), document);
   assert.equal(document.width, 400);
   assert.equal(document.height, 300);
@@ -234,4 +246,45 @@ test("sessions with identical IDs keep document replacement, canvas changes and 
   assert.equal(secondDocument.height, 100);
   assert.deepEqual(first.requireDocument().topLevel(), []);
   assertHistoryLocked(first);
+});
+
+test("session creation and deletion preserve original nested objects, fill and sibling order across history", () => {
+  const session = new EditorSession();
+  session.init();
+  session.createShape("g", "scene", []);
+  session.createShape("rect", "before", ["0", "0", "10", "10"], "scene");
+  session.createShape("g", "nested", [], "scene");
+  session.createShape("rect", "leaf", ["-1.5", "20", "30", "40", "#4a90d9"], "nested");
+  session.createShape("rect", "after", ["0", "0", "10", "10"], "scene");
+  const document = session.requireDocument();
+  const scene = document.requireContainer("scene");
+  const nested = document.requireContainer("nested");
+  const before = document.require("before");
+  const after = document.require("after");
+  const leaf = document.require("leaf");
+  assert.ok(leaf instanceof RectShape);
+
+  session.deleteShape("nested");
+  for (let cycle = 0; cycle < 2; cycle++) {
+    assert.deepEqual(scene.children(), [before, after]);
+    assert.equal(document.find("nested"), undefined);
+    assert.equal(document.find("leaf"), undefined);
+    session.undo();
+    assert.deepEqual(scene.children(), [before, nested, after]);
+    assert.strictEqual(document.require("nested"), nested);
+    assert.strictEqual(document.require("leaf"), leaf);
+    assert.deepEqual(nested.children(), [leaf]);
+    assert.deepEqual(leaf.position, { x: -1.5, y: 20 });
+    assert.equal(leaf.width, 30);
+    assert.equal(leaf.height, 40);
+    assert.equal(leaf.fill, "#4a90d9");
+    session.redo();
+  }
+
+  session.undo();
+  session.undo();
+  assert.deepEqual(scene.children(), [before, nested]);
+  session.redo();
+  assert.strictEqual(document.require("after"), after);
+  assert.deepEqual(scene.children(), [before, nested, after]);
 });
