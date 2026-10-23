@@ -1,4 +1,4 @@
-import type { Shape } from "../shape/Shape.js";
+import type { GeometryChange, Shape } from "../shape/Shape.js";
 import { GroupShape } from "../shape/GroupShape.js";
 
 /** 原图形及其所在位置的记录，供删除、迁移和排序撤销使用。 */
@@ -220,6 +220,92 @@ export class SvgDocument {
     const { parent } = this.locate(shape);
 
     return this.moveTo(shape, parent, 0);
+  }
+
+  /**
+   * 按原文档顺序收编节点，在最近公共父容器的第一个相关分支处插入新组。
+   * 准备阶段完成存在性、唯一性和祖先冲突检查，不摘除任何节点。
+   */
+  public prepareGroup(group: GroupShape, ids: readonly string[]): GeometryChange {
+    this.validateNewSubtree(group);
+    if (group.children().length !== 0) throw new RangeError("new group must be empty");
+    if (ids.length === 0) throw new RangeError("group requires at least one shape");
+    if (new Set(ids).size !== ids.length) throw new RangeError("group targets must be distinct");
+    const selected = new Set(ids.map((id) => this.require(id)));
+    const locations: ShapeLocation[] = [];
+    const visit = (shapes: readonly Shape[], parent: GroupShape | null, ancestor?: Shape): void => {
+      for (const [index, shape] of shapes.entries()) {
+        const included = selected.has(shape);
+        if (included && ancestor !== undefined) {
+          throw new RangeError(`cannot group a container into its own descendant: ${ancestor.id}`);
+        }
+        if (included) locations.push({ shape, parent, index });
+        if (shape instanceof GroupShape) visit(shape.children(), shape, included ? shape : ancestor);
+      }
+    };
+    visit(this.rootShapes, null);
+
+    const ancestry = (parent: GroupShape | null): (GroupShape | null)[] => {
+      const chain: (GroupShape | null)[] = [];
+      while (parent !== null) {
+        chain.push(parent);
+        parent = this.parentOf(parent);
+      }
+      return [...chain, null];
+    };
+    const chains = locations.map((location) => ancestry(location.parent));
+    const parent = chains[0]!.find((candidate) => chains.every((chain) => chain.includes(candidate))) ?? null;
+    const branchIndex = (shape: Shape): number => {
+      let location = this.locate(shape);
+      while (location.parent !== parent) location = this.locate(location.parent!);
+      return location.index;
+    };
+    const index = Math.min(...locations.map(({ shape }) => branchIndex(shape)));
+
+    return {
+      apply: () => {
+        for (const location of locations) {
+          this.remove(location.shape);
+          group.add(location.shape);
+        }
+        this.add(group, parent, index);
+      },
+      undo: () => {
+        this.remove(group);
+        for (const location of locations) group.remove(location.shape.id);
+        // locations 保持文档顺序，同一父容器的下标从小到大恢复。
+        for (const location of locations) this.restore(location);
+      },
+    };
+  }
+
+  /** 解散嵌套组，子节点占据原组的位置；显式样式下放以保留继承外观。 */
+  public prepareUngroup(id: string): GeometryChange {
+    const group = this.requireContainer(id);
+    const location = this.locate(group);
+    if (location.parent === null) throw new RangeError(`cannot ungroup top-level container: ${id}`);
+    const children = group.children();
+    const styles = children.flatMap((child) => Object.entries(group.attributes())
+      .filter(([name]) => !Object.hasOwn(child.attributes(), name))
+      .map(([name, value]) => child.prepareSet(name, String(value))));
+    return {
+      apply: () => {
+        this.remove(group);
+        for (const [offset, child] of children.entries()) {
+          group.remove(child.id);
+          this.add(child, location.parent, location.index + offset);
+        }
+        for (const style of styles) style.apply();
+      },
+      undo: () => {
+        for (const child of children) {
+          this.remove(child);
+          group.add(child);
+        }
+        this.restore(location);
+        for (const style of [...styles].reverse()) style.undo();
+      },
+    };
   }
 
   /**

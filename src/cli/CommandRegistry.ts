@@ -26,6 +26,8 @@ export class CommandRegistry {
       ["move", (args) => this.move(args)],
       ["scale", (args) => this.scale(args)],
       ["set", (args) => this.set(args)],
+      ["group", (args) => this.group(args)],
+      ["ungroup", (args) => this.ungroup(args)],
       [
         "undo",
         (args) => {
@@ -188,6 +190,19 @@ export class CommandRegistry {
     this.session.scaleShape(id, factor);
     const shape = this.session.requireDocument().require(id);
     return { kind: "message", text: `${shape.type}#${id} scaled by ${factor}` };
+  }
+
+  private group(args: readonly string[]): CommandResult {
+    if (args.length < 2) throw new RangeError("usage: group <newGid> <id1> [id2...]");
+    const id = args[0]!;
+    this.session.groupShapes(id, args.slice(1));
+    return { kind: "message", text: `g#${id} created with ${args.length - 1} children` };
+  }
+
+  private ungroup(args: readonly string[]): CommandResult {
+    const id = this.singleId(args, "ungroup <gid>");
+    this.session.ungroupShape(id);
+    return { kind: "message", text: `g#${id} ungrouped` };
   }
 
   private set(args: readonly string[]): CommandResult {

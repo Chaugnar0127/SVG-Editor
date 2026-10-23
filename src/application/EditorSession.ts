@@ -8,6 +8,8 @@ import { ReorderCommand, type OrderEdge } from "./commands/ReorderCommand.js";
 import { MoveCommand } from "./commands/MoveCommand.js";
 import { ScaleCommand } from "./commands/ScaleCommand.js";
 import { SetAttributeCommand } from "./commands/SetAttributeCommand.js";
+import { GroupCommand } from "./commands/GroupCommand.js";
+import { UngroupCommand } from "./commands/UngroupCommand.js";
 
 /** 当前文档与只管理该文档的命令总线。 */
 interface ActiveDocument {
@@ -71,6 +73,14 @@ export class EditorSession {
 
   public setAttribute(id: string, attribute: string, value: string): void {
     this.execute(new SetAttributeCommand(id, attribute, value));
+  }
+
+  public groupShapes(id: string, ids: readonly string[]): void {
+    this.execute(new GroupCommand(id, ids));
+  }
+
+  public ungroupShape(id: string): void {
+    this.execute(new UngroupCommand(id));
   }
 
   /** 将已有图形或整棵子树追加到目标组。 */
