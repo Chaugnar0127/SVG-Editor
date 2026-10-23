@@ -3,6 +3,8 @@ import test from "node:test";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
+import { TextShape } from "../../src/domain/shape/TextShape.js";
+import { LineShape } from "../../src/domain/shape/LineShape.js";
 import type { Shape } from "../../src/domain/shape/Shape.js";
 import { Formatters } from "../../src/presentation/Formatters.js";
 
@@ -22,6 +24,16 @@ function scene() {
   document.add(empty);
   return { document, outer, inner, a, b, tail, empty, formatters: new Formatters() };
 }
+
+test("tree shows text position and quoted content, and line endpoints with styles", () => {
+  const document = new SvgDocument();
+  document.add(new TextShape("label", 20, 40, "开始\n结束"));
+  document.add(new LineShape("edge", 10, 20, 30, 40, "black"));
+  assert.equal(new Formatters().tree(document), [
+    "svg (800x600)", '├── text#label  (20,40) "开始\\n结束"',
+    "└── line#edge  (10,20) -> (30,40) stroke=black",
+  ].join("\n"));
+});
 
 test("tree renders empty documents, nested branches, subtrees and leaves without trailing whitespace", () => {
   const { document, formatters } = scene();
