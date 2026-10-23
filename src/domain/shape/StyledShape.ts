@@ -33,8 +33,9 @@ export abstract class StyledShape implements Shape {
     } else if (value.trim().length === 0) {
       throw new RangeError(`${attribute} must not be empty`);
     }
-    return this.change(this.style, { ...this.style, [attribute]: next }, (style) => {
-      this.style = style;
+    return this.change<string | number | undefined>(this.style[attribute], next, (style) => {
+      if (style === undefined) delete this.style[attribute];
+      else this.style[attribute] = style;
     });
   }
 

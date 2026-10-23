@@ -45,12 +45,16 @@ test("same-parent grouping and ungroup occupy the original slot and keep explici
   const pair = document.requireContainer("pair");
   assert.deepEqual(left.children().map((shape) => shape.id), ["left0", "pair", "left3"]);
   session.setAttribute("pair", "fill", "green");
+  session.setAttribute("pair", "stroke", "black");
+  session.setAttribute("pair", "stroke-width", "2");
   session.setAttribute("left2", "fill", "red");
   const before = new Formatters().tree(document);
   session.ungroupShape("pair");
   assert.deepEqual(left.children().map((shape) => shape.id), ["left0", "left1", "left2", "left3"]);
   assert.equal(document.require("left1").attributes().fill, "green");
   assert.equal(document.require("left2").attributes().fill, "red");
+  assert.equal(document.require("left1").attributes().stroke, "black");
+  assert.equal(document.require("left1").attributes()["stroke-width"], 2);
   for (let i = 0; i < 3; i++) {
     session.undo();
     assert.strictEqual(document.require("pair"), pair);
