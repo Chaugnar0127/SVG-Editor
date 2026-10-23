@@ -16,6 +16,9 @@ export class CommandRegistry {
     this.handlers = new Map<string, CommandHandler>([
       ["init", (args) => this.init(args)],
       ["canvas", (args) => this.canvas(args)],
+      ["read", (args) => this.read(args)],
+      ["save", (args) => this.save(args)],
+      ["help", (args) => this.help(args)],
       ["create", (args) => this.create(args)],
       ["delete", (args) => this.deleteShape(args)],
       ["addto", (args) => this.addTo(args)],
@@ -132,6 +135,41 @@ export class CommandRegistry {
       kind: "message",
       text: `${type}#${id} created${suffix}`,
     };
+  }
+
+  private read(args: readonly string[]): CommandResult {
+    expectCount(args, [1], "read <file.svg>");
+    const path = args[0]!;
+    const warnings = this.session.read(path);
+    return { kind: "message", text: [...warnings,
+      `read ${path} (${this.session.requireDocument().elementCount} elements)`].join("\n") };
+  }
+
+  private save(args: readonly string[]): CommandResult {
+    expectCount(args, [0, 1], "save [file.svg]");
+    const path = this.session.save(args[0]);
+    return { kind: "message", text: `saved to ${path} (${this.session.requireDocument().elementCount} elements)` };
+  }
+
+  private help(args: readonly string[]): CommandResult {
+    expectCount(args, [0], "help");
+    return { kind: "message", text: [
+      "init [w] [h]                         new canvas (default 800x600)",
+      "read <file.svg>                       open SVG", "save [file.svg]                       save SVG",
+      "canvas [w h]                         show or resize canvas",
+      "create rect <id> <x> <y> <w> <h> [fill]",
+      "create circle <id> <cx> <cy> <r> [fill]",
+      "create ellipse <id> <cx> <cy> <rx> <ry> [fill]",
+      "create line <id> <x1> <y1> <x2> <y2> [stroke]",
+      'create text <id> <x> <y> "content"', "create g <id>",
+      "  append [in <containerId>] to any create command",
+      "delete <id> | move <id> <dx> <dy> | scale <id> <factor>",
+      "set <id> <attr> <value>               style, geometry or text content",
+      "group <newGid> <id1> [id2...] | ungroup <gid> | addto <gid> <id>",
+      "front <id> | back <id>                reorder siblings",
+      "tree [id] | show <id> | help", "undo | redo | exit | quit",
+      'Use double quotes for spaces; lines starting with # are comments.',
+    ].join("\n") };
   }
 
   private deleteShape(args: readonly string[]): CommandResult {

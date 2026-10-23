@@ -50,7 +50,7 @@ export class Repl {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
-      stdout.write(`error: ${message}\n`);
+      stdout.write(`error: ${message.replace(/[\r\n]+/gu, " ")}\n`);
     }
 
     terminal.prompt();

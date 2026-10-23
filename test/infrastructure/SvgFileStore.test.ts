@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { EditorSession } from "../../src/application/EditorSession.js";
+import { SvgFileStore } from "../../src/infrastructure/SvgFileStore.js";
+
+test("real file save/read establishes a default path, locks history and preserves failures", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "svg-editor-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const session = new EditorSession(new SvgFileStore());
+  session.init();
+  assert.throws(() => session.save(), /no file path/u);
+  session.createShape("text", "t", ["10", "20", "开始 & 结束"]);
+  const file = join(directory, "with spaces.svg");
+  assert.equal(session.save(file), file);
+  assert.throws(() => session.undo(), /undo not allowed after io command/u);
+  session.moveShape("t", 1, 2);
+  session.undo();
+  const document = session.requireDocument();
+  const targetDirectory = join(directory, "directory.svg");
+  mkdirSync(targetDirectory);
+  assert.throws(() => session.save(targetDirectory), { message: `cannot write file: ${targetDirectory}` });
+  assert.deepEqual(readdirSync(directory).sort(), ["directory.svg", "with spaces.svg"]);
+  session.redo();
+  assert.equal(document.require("t").attributes().x, 11);
+  const missing = join(directory, "missing.svg");
+  assert.throws(() => session.read(missing), { message: `cannot read file: ${missing}` });
+  assert.strictEqual(session.requireDocument(), document);
+  session.undo();
+  const malformed = join(directory, "malformed.svg");
+  writeFileSync(malformed, "<not-svg>");
+  assert.throws(() => session.read(malformed), /invalid SVG/u);
+  session.redo();
+  assert.equal(session.save(), file, "failed save must not replace the default path");
+  assert.match(readFileSync(file, "utf8"), /x="11"/u);
+  assert.deepEqual(session.read(file), []);
+  assert.notStrictEqual(session.requireDocument(), document);
+  assert.equal(session.requireDocument().require("t").attributes().text, "开始 & 结束");
+  assert.throws(() => session.redo(), /undo not allowed after io command/u);
+  session.init();
+  assert.throws(() => session.save(), /no file path/u);
+});
+
+test("failed serialization never overwrites an existing file or locks edit history", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "svg-editor-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const file = join(directory, "original.svg");
+  writeFileSync(file, "original contents");
+  const session = new EditorSession(new SvgFileStore());
+  session.init();
+  session.createShape("text", "t", ["0", "0", "\u0000"]);
+  assert.throws(() => session.save(file), /forbidden in XML/u);
+  assert.equal(readFileSync(file, "utf8"), "original contents");
+  session.undo();
+  assert.equal(session.requireDocument().elementCount, 0);
+});

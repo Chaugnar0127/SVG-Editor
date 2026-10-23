@@ -12,13 +12,19 @@ export class SvgDocument {
   private widthValue: number;
   private heightValue: number;
   private readonly rootShapes: Shape[] = [];
+  private viewBoxValue: readonly [number, number, number, number];
 
   /** 创建空文档，默认画布为 800×600；非法尺寸会在初始化前被拒绝。 */
-  public constructor(width: number = 800, height: number = 600) {
+  public constructor(width: number = 800, height: number = 600, viewBox?: readonly [number, number, number, number]) {
     this.validateDimensions(width, height);
 
     this.widthValue = width;
     this.heightValue = height;
+    const box = viewBox ?? [0, 0, width, height];
+    if (!box.every(Number.isFinite) || box[2] <= 0 || box[3] <= 0) {
+      throw new RangeError("viewBox must contain finite coordinates and positive dimensions");
+    }
+    this.viewBoxValue = [...box];
   }
 
   /** 读取画布宽度；修改尺寸统一通过 resize 完成。 */
@@ -31,12 +37,22 @@ export class SvgDocument {
     return this.heightValue;
   }
 
+  public get viewBox(): readonly [number, number, number, number] {
+    return [...this.viewBoxValue];
+  }
+
+  public get elementCount(): number {
+    const count = (shapes: readonly Shape[]): number => shapes.reduce((total, shape) => total + 1 + count(shape.children()), 0);
+    return count(this.rootShapes);
+  }
+
   /** 两个尺寸全部校验通过后再更新，避免失败时只改了一半。 */
   public resize(width: number, height: number): void {
     this.validateDimensions(width, height);
 
     this.widthValue = width;
     this.heightValue = height;
+    this.viewBoxValue = [0, 0, width, height];
   }
 
   /** 返回顶层节点数组的副本以保护内部顺序，数组内仍引用原图形。 */

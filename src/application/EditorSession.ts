@@ -10,16 +10,20 @@ import { ScaleCommand } from "./commands/ScaleCommand.js";
 import { SetAttributeCommand } from "./commands/SetAttributeCommand.js";
 import { GroupCommand } from "./commands/GroupCommand.js";
 import { UngroupCommand } from "./commands/UngroupCommand.js";
+import type { DocumentStore } from "./DocumentStore.js";
 
 /** 当前文档与只管理该文档的命令总线。 */
 interface ActiveDocument {
   readonly document: SvgDocument;
   readonly commands: CommandBus;
+  path?: string;
 }
 
 export class EditorSession {
   private readonly shapeFactory = new ShapeFactory();
   private current: ActiveDocument | undefined;
+
+  public constructor(private readonly store?: DocumentStore) {}
 
   /** 新文档创建成功后，再整体替换当前文档及其历史。 */
   public init(width: number = 800, height: number = 600): void {
@@ -34,6 +38,28 @@ export class EditorSession {
   /** 获取当前文档，供尺寸查询和展示使用；编辑通过会话用例提交。 */
   public requireDocument(): SvgDocument {
     return this.requireCurrent().document;
+  }
+
+  /** 解析和模型校验全部成功后，才替换文档、路径及历史。 */
+  public read(path: string): readonly string[] {
+    const loaded = this.requireStore().read(path);
+    const commands = new CommandBus(loaded.document);
+    commands.lockAfterIO();
+    this.current = { document: loaded.document, commands, path };
+    return loaded.warnings;
+  }
+
+  /** 写入失败保留原路径与历史；首次 save 成功也建立默认保存路径。 */
+  public save(path?: string): string {
+    const current = this.requireCurrent();
+    const destination = path ?? current.path;
+    if (destination === undefined || destination.trim().length === 0) {
+      throw new RangeError("no file path. use 'save <file.svg>' first");
+    }
+    this.requireStore().write(destination, current.document);
+    current.path = destination;
+    current.commands.lockAfterIO();
+    return destination;
   }
 
   /** 尺寸修改成功后，清空历史并锁定撤销和重做。 */
@@ -117,5 +143,10 @@ export class EditorSession {
     }
 
     return current;
+  }
+
+  private requireStore(): DocumentStore {
+    if (this.store === undefined) throw new Error("document store is not configured");
+    return this.store;
   }
 }
