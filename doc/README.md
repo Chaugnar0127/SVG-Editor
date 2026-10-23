@@ -1,181 +1,210 @@
 # SVG 编辑器 CLI 架构方案
 
-本文记录 `lab/phase_cli_1.md` 的当前架构、修订理由与验证结果，更新于 2026-10-22。已实现矩形和组、文档树、部分编辑命令、撤销重做及 CLI 展示；完整实验尚未完成。调研依据见 [`research-sources.md`](research-sources.md)，[`architecture-notes.md`](architecture-notes.md) 保留实现前的历史草案，当前设计以本文为准。
+本文记录 Phase 1 的最终实现，更新于 2026-10-23。六种内置图形和实验命令已完成，`box` 及外部插件系统属于后续阶段。使用方式见 [项目说明](../README.md)。
 
 ## 架构方案
 
 ### 模块划分
 
-项目采用 TypeScript + 面向对象。主要类各自一个文件；小型关联类型与使用它的模块放在一起。下面列出实际文件，不为尚未实现的功能预建类和目录。
+项目采用 TypeScript + 面向对象，主要类各自一个文件，小型关联接口与所属模块放在一起。
 
 ```text
 src/
-  main.ts                         # 组装会话、分词器、注册表和 REPL
+  main.ts                         # 组合入口，注入文件适配器并启动 CLI
   cli/
-    Repl.ts                       # 读行、提示符、输出、退出生命周期
+    Repl.ts                       # 读行、提示符、错误输出、退出生命周期
     Tokenizer.ts                  # 空白、双引号、空参数、整行注释
-    CommandRegistry.ts            # 唯一命令名分派点、用例调用及反馈
+    CommandRegistry.ts            # 命令名分派、参数语法、用例调用及反馈
   application/
-    EditorSession.ts              # 当前文档及其历史、具体编辑入口
-    CommandBus.ts                 # EditCommand、undo/redo 栈、IO 锁
-    ShapeFactory.ts               # 唯一图形类型分派点、创建参数解析
-    arguments.ts                  # 工厂与 CLI 共用的文本参数检查
+    EditorSession.ts              # 当前文档、文件路径、编辑入口与历史配对
+    CommandBus.ts                 # EditCommand、undo/redo 栈及 IO 锁
+    ShapeFactory.ts               # 唯一图形类型分派点，CLI/导入共用构造规则
+    DocumentStore.ts              # 文档存储端口及读入结果接口
+    arguments.ts                  # CLI 与工厂共享的参数检查
     commands/
-      CreateCommand.ts            # 创建原对象、撤销、重做
-      DeleteCommand.ts            # 删除和恢复整棵子树
-      MoveCommand.ts              # 将叶子或整组平移纳入一个历史步骤
-      AddToCommand.ts             # 迁移到指定组、恢复原位置
-      ReorderCommand.ts           # 统一处理同级置顶和置底
+      CreateCommand.ts            # 创建及撤销
+      DeleteCommand.ts            # 删除、恢复完整子树
+      MoveCommand.ts              # 叶子或整组平移
+      ScaleCommand.ts             # 叶子或整组缩放
+      SetAttributeCommand.ts      # 白名单属性编辑
+      GroupCommand.ts             # 收编现有节点，恢复所有原位置
+      UngroupCommand.ts           # 解组，恢复组及继承样式
+      AddToCommand.ts             # 迁移到指定组
+      ReorderCommand.ts           # 同级置顶和置底
   domain/
-    document/
-      SvgDocument.ts              # 画布、文档树、全局 ID、结构操作与位置记录
+    document/SvgDocument.ts        # 画布、viewBox、文档树、ID 与结构不变量
     shape/
       Shape.ts                    # Shape、ShapeAttributes、GeometryChange
-      RectShape.ts                # 矩形不变量、可恢复的几何变更
-      GroupShape.ts               # 子节点顺序、防环、递归准备几何变更
+      StyledShape.ts              # 公共 ID 校验、样式白名单及恢复辅助方法
+      RectShape.ts                # 矩形
+      CircleShape.ts              # 圆
+      EllipseShape.ts             # 椭圆
+      LineShape.ts                # 直线
+      TextShape.ts                # 文本位置及内容
+      GroupShape.ts               # 有序子节点、防环、递归准备变更
+  infrastructure/
+    SvgCodec.ts                   # XML 解析、序列化、命名空间、缺失 ID
+    SvgFileStore.ts               # 真实文件读写及临时文件替换
   presentation/
     Formatters.ts                 # 只读生成 tree/show 文本
 test/
-  application/                    # 工厂、会话、命令及历史测试
-  domain/                         # 几何不变量、原子性及文档树测试
-  cli/                            # 参数分发、分词、真实 CLI 进程测试
-  presentation/                   # 展示格式及只读行为测试
+  domain/                         # 几何不变量、原子性、文档结构
+  application/                    # 命令、工厂、会话及混合历史
+  cli/                            # 输入、分发、真实进程及实验会话
+  infrastructure/                 # SVG 往返与真实文件错误场景
+  presentation/                   # 树形展示、属性及只读行为
+  architecture/                   # 模块依赖方向检查
+examples/
+  flowchart.txt                   # 可回放的流程图命令
+  flowchart.svg                   # 编译后 CLI 生成的结果
 ```
 
-`SvgDocument` 维护文档结构和全局 ID 唯一性；`Shape` 实现维护自己的几何规则。`GroupShape` 只管理直接子节点，并通过相同接口递归操作子树。查找采用树遍历，尚无必要维护第二套 ID 缓存或父指针。
+`SvgDocument` 负责文档结构、唯一 ID 和画布信息，图形类维护各自私有几何状态。几何不是公共动态属性袋，`attributes()` 只提供独立快照。查找采用树遍历，没有额外维护父指针或 ID 缓存。
 
-`EditorSession` 将当前文档与对应 `CommandBus` 配对保存。CLI 调用具体用例，由会话创建编辑命令并提交历史。通用 `execute` 为会话私有实现，外部无需同时了解会话和命令组装。
-
-`ShapeFactory` 接收图形类型及文本参数，负责将创建请求转换为领域对象，因此放在应用层。工厂和注册表共享 `arguments.ts` 的参数个数与有限数解析；正数、坐标溢出等领域约束仍由模型校验。这里的两个自由函数只处理输入，不代替领域对象的行为。
-
-`Repl` 是当前终端 IO 边界，集中处理异常并只添加一次 `error:` 前缀。`Formatters` 查询领域对象并返回字符串，不编辑文档、不操作历史。
+`EditorSession` 把当前文档与对应 `CommandBus` 配对保存，外部调用具体用例。`ShapeFactory` 同时服务文本命令与 XML 导入，导入器只传普通属性和文本，不把 XML 节点类型泄漏给应用层。
 
 ```plantuml
 @startuml
 skinparam componentStyle rectangle
-[main] --> [cli]
-[main] --> [application]
-[cli] --> [application]
-[cli] --> [presentation]
-[presentation] --> [domain]
-[application] --> [domain]
+component main
+component cli
+component presentation
+component application
+component domain
+component infrastructure
+interface DocumentStore
+main --> cli
+main --> application
+main --> infrastructure
+cli --> application
+cli --> presentation
+presentation --> domain
+application --> domain
+application --> DocumentStore
+infrastructure ..|> DocumentStore
+infrastructure --> application : ShapeFactory
+infrastructure --> domain
 @enduml
 ```
 
 ### 设计模式的选择与落地
 
-| 模式或设计手法 | 当前用途 | 取舍 |
+| 模式或设计手法 | 实现位置与作用 | 取舍 |
 |---|---|---|
-| Command（命令模式，实验要求） | 编辑对象保存执行参数和恢复记录；总线管理历史 | 保留；只有可撤销编辑实现 `EditCommand`，不把查询、退出和初始化也包装成命令类 |
-| Composite（组合模式） | 矩形与组实现 `Shape`；组递归准备后代变更 | 保留；应用命令无需区分叶子和组，不在命令中按图形类型分支 |
-| 简单工厂 / 注册表 | `ShapeFactory` 的 Map 集中构造图形；`CommandRegistry` 的 Map 集中分发命令 | 保留；当前不是 Abstract Factory 或完整插件系统，不增加无实际调用者的 Provider 层 |
-| Facade（外观模式） | `EditorSession` 隐藏当前文档选择、命令创建与历史配对 | 保留；这是实际用例边界，通用执行细节保持私有 |
-| 局部恢复记录 | `GeometryChange` 捕获几何原值，`ShapeLocation` 保存原对象和位置 | 直接使用闭包与小型接口；无需增加独立的 Memento 类层次或通用事务框架 |
+| Command（命令模式） | 九个编辑命令实现 `EditCommand`，`CommandBus` 管理执行、撤销和重做 | 查询和文件操作不包装成可撤销命令 |
+| Composite（组合模式） | 六种图形实现 `Shape`，组持有同接口的子节点并递归准备移动、缩放 | 命令不按图形标签分支；组样式按 SVG 规则继承 |
+| 简单工厂 / 注册表 | `ShapeFactory` 集中类型构造，`CommandRegistry` 集中命令分派 | 保留两个静态 Map；当前不称为完整插件系统 |
+| Facade（外观模式） | `EditorSession` 隐藏文档选择、命令构造、历史和文件路径 | 通用执行方法私有，调用者使用明确的用例方法 |
+| Adapter（适配器）及依赖倒置 | `DocumentStore` 定义应用需要的能力，`SvgFileStore` 对接文件系统，`SvgCodec` 对接 XML | Node 文件 API 和第三方库仅位于外层 |
+| 局部恢复记录 | `GeometryChange` 保存变更前后值，`ShapeLocation` 保存原对象、父容器及下标 | 使用闭包和小接口，不增加独立 Memento 类层次或通用事务框架 |
 
-#### 编辑历史
+`StyledShape` 共享所有图形实际需要的 ID、样式和恢复行为；各子类仍负责几何属性白名单、尺寸及坐标约束。基类不认识具体图形标签。
 
-`EditCommand` 与总线定义在同一文件，只有两个操作：`execute(document)` 和 `undo(document)`。执行、撤销或重做失败时，文档及命令自身状态应保持不变。总线在命令成功后才移动历史记录，不为任意命令自动回滚。
-
-新编辑成功后进入 undo 栈、清空 redo 栈并解除 IO 锁。重做调用原命令的 `execute()`，保留其他尚未重做的记录。命令实例只属于一个总线；普通编辑创建新实例，重做复用原实例。重复执行未撤销的命令、撤销未执行的命令会被拒绝。
-
-`init` 在新文档建立成功后整体替换文档与历史；`canvas` 修改成功后保留文档对象、清理并锁定历史。失败保持旧状态；查询不影响历史。`read/save` 尚未实现，不能由内存 IO 锁测试推断文件操作已正确。
-
-`ReorderCommand(id, "front" | "back")` 合并原有两个几乎相同的命令类。CLI 仍提供 `front` 和 `back` 两条指令；领域层保留 `bringToFront/sendToBack`，它们封装当前父容器及对应绘制顺序。已经位于边界的成功排序仍占一个历史步骤。
-
-创建、删除、迁移和几何编辑保存的输入及恢复状态不同。各自少量生命周期检查暂时保留；仅为消除几行重复而建立通用命令基类，会让状态类型、钩子方法和失败时机更难追踪。
-
-#### 几何原子性与撤销
-
-`Shape` 仅提供 `prepareMove` 和 `prepareScale`，没有另一套直接修改的 `move/scale`。准备方法计算并校验结果，返回 `GeometryChange { apply, undo }`；准备过程不修改图形。组先准备所有后代，全部成功后调用者才能提交，因此后面的子图形失败不会留下前面已修改的状态。
-
-保留准备阶段有实际原因：整组变更需要原子性，撤销需要恢复原始数值。`undo` 写回保存的值，不通过反向平移或除以缩放因子恢复，避免浮点舍入让原值丢失。矩形的平移和缩放共用私有恢复逻辑，同时检查坐标、尺寸溢出以及尺寸下溢到零。
-
-`MoveCommand` 完成目标查找、同步准备和提交，并保存原对象及变更。撤销先确认目标仍是原对象，再恢复几何。缩放的领域能力已经统一，但 `ScaleCommand` 和 CLI `scale` 尚未接入。
-
-这些几何变更是同步使用的：准备与提交之间不能插入其他编辑，多步变更按执行的逆序撤销。当前没有异步编辑或并发调度。将来增加异步输入时，应由应用层串行执行编辑；当前记录不具备版本冲突检测能力。
-
-#### 文档结构与恢复
-
-`ShapeLocation` 在 `SvgDocument.ts` 内定义，包含 `shape`、`parent` 和 `index`，描述记录时的位置，不表示图形当前是否已摘下。删除用 `restore()` 重新插入子树；迁移和排序用 `moveTo()` 将仍在文档内的原对象移回原位置。
-
-`add()` 统一顶层和组内插入、父容器身份与全局 ID 检查；`restore()` 复用它。`moveTo()` 的下标按摘下节点后的目标列表计算；插入失败时恢复原位置，再抛出错误。`topLevel()`、`children()` 和 `attributes()` 返回独立副本，其中节点数组仍引用原对象。
+实验允许的两处按名字分派都已集中：命令名只在 `CommandRegistry`，图形类型名只在 `ShapeFactory`。这两处静态内置注册是后续插件阶段的待重构点；届时可注入命令或类型定义，当前不承诺新增外部插件时内核零修改。序列化通过图形的类型、属性和子节点接口工作；展示对文本位置和端点属性做排版，没有另一张图形构造表。
 
 ### 依赖方向规则
 
 | 模块 | 允许依赖 | 原因 |
 |---|---|---|
-| `domain` | 领域内部 | 图形与文档规则不依赖文本命令、终端或 XML 库 |
-| `application` | 本层与 `domain` | 解析应用请求、编排领域行为并管理历史 |
-| `presentation` | `domain` 的查询能力 | 展示不修改状态、不调用应用编辑 |
-| `cli` | `application`、`presentation`；REPL 使用 Node 读行 | 文本交互留在外层 |
-| `main` | 组装所需模块 | 组合根创建依赖 |
+| domain | domain | 领域规则可独立于终端、存储、XML 库运行 |
+| application | application、domain | 组织用例、历史及存储端口，不选择外部实现 |
+| presentation | presentation、domain | 查询模型并生成展示文本 |
+| cli | cli、application、presentation、Node 终端 API | 负责输入和反馈，不直接构造具体图形或读取文件 |
+| infrastructure | infrastructure、application、domain、外部 IO/XML 库 | 实现应用端口，复用工厂和领域校验 |
+| main | 所有需要装配的外层模块 | 唯一组合入口，显式注入真实文件适配器 |
 
-领域层禁止导入应用层、CLI、Node IO 或 XML 库；应用层禁止导入 CLI、`readline` 或具体 XML parser。CLI 编辑须调用会话用例，不能直接调用图形或文档的修改方法。实际 import 已按这些方向检查。
+`arguments.ts` 的自由函数仅校验输入个数和数字，不承载领域行为。`test/architecture/Dependencies.test.ts` 自动检查上述静态 import 规则。
 
-`CommandRegistry` 和 `ShapeFactory` 是实验允许的两处按名字分派点，标记为**插件扩展时待重构**。当前集中注册足以支持已有功能；增加第三处类型或命令名分派前，应先调整这两个入口。
+### 编辑原子性与历史
+
+`EditCommand` 只有 `execute(document)` 和 `undo(document)`。总线只在操作成功后移动历史记录。每次新编辑使用新命令实例，重做复用原命令。失败保留两个栈；成功新编辑清空 redo 栈。
+
+图形通过 `prepareMove/prepareScale/prepareSet` 先计算并验证结果，再返回可提交的 `GeometryChange`。组先准备所有后代，任何后代溢出都不会造成部分提交。撤销写回保存的原值，不用相反平移或除法恢复，因此能精确还原大数浮点运算前的值。
+
+`set` 恢复单个属性的旧值或原先未设置的状态。这样解组时可以同时准备多个继承属性，提交时不会相互覆盖。几何尺寸要求正数，坐标要求有限数，`stroke-width` 允许零。
+
+`group` 先验证所有目标、ID 和祖先关系，再按原文档深度优先顺序收编。在最近公共父容器中，放到第一个相关分支的位置；同父容器时对应第一个被选节点的位置。这补充了实验未规定的跨父容器插入规则。撤销按原顺序恢复所有父容器和下标，保留对象身份。
+
+`ungroup` 拒绝顶层容器，将嵌套组的子节点提升到组原来的位置。组上未被子节点覆盖的显式样式会下放，避免外观变化；撤销会恢复原组及样式的显式/未设置状态。空组也可解散和恢复。
+
+`init/read/save` 与带参数的 `canvas` 成功后清空并锁定历史，undo/redo 报 `undo not allowed after io command`。下一次成功编辑解锁。无参数 `canvas`、`tree/show/help` 不影响历史。
+
+### 文件与会话生命周期
+
+`DocumentStore` 使用同步接口。当前产品是单用户 CLI，已有 REPL 按行同步调用；同步文件操作能保持管道回放的严格顺序，也避免保存未完成时执行下一条编辑。大型文件会阻塞终端，这是一项明确取舍。若未来加入服务器或 GUI，再将端口改成异步并加入顺序调度；当前没有后台任务或并发写入。
+
+`read` 完成 XML 解析、ID 分配和整个领域树校验后，才替换当前文档、历史和默认路径。显式 ID 先全量预留，自动分配不会抢占文件后面已有的 ID。警告只在成功读入后输出。
+
+`save` 先编码，写入目标同目录的唯一临时文件，关闭后 rename 替换目标。成功后才更新默认路径并锁定历史；失败尝试清理本次临时文件。保存到目录、缺失父目录或编码失败会保留原文件及会话状态。这不等于提供断电后的持久性保证，当前未做 fsync。
+
+XML 采用 [`@xmldom/xmldom`](https://github.com/xmldom/xmldom) 的 DOMParser/XMLSerializer。解析器报告的 warning/error 都视为失败，禁止 DTD、非 SVG 命名空间和不支持的元素/属性。输出对属性和文本正确转义，文本内容写入字符节点。`viewBox` 可与画布尺寸不同并保持往返；`canvas w h` 会将其重置为 `0 0 w h`。
+
+支持范围为六种元素、公共样式、各类型几何属性和纯文本/CDATA。长度支持普通数字及 `px`，不支持百分比或其他单位；`transform`、CSS、`path`、`tspan`、外部资源和其他扩展属性明确报错，不静默丢弃。`box` 属于后续插件阶段，本阶段按未知类型拒绝。
 
 ### 变化点假设
 
-1. **新增图形：** 新类实现 `Shape` 并加入工厂；编辑和展示使用统一接口。当前未引入只有 ID 公共字段的 `LeafShape` 基类。
-2. **SVG 文件读写：** 实现时隔离 XML 和文件系统，成功后再替换文档或清理历史；当前不预建空的 `ports/adapters/DocumentPath/DocumentSnapshot`。
-3. **插件注册：** 出现第一种外部图形时再确定注册与读写协议，不凭尚未实现的 `box` 提前规定 Provider 层次。
-4. **其他入口：** 复用 `EditorSession` 的具体用例。创建当前接收文本参数；若 GUI 或导入器需要类型化请求，再结合真实调用者调整，不声称现有创建接口完全与输入形式无关。
-5. **展示格式：** 集中修改 `Formatters`；不为唯一终端实现增加无调用需求的 `Output` 接口。
-6. **规模与并发：** 当前树遍历和同步内存历史足够；只有性能证据或异步需求出现后再引入索引、版本号或调度机制。
+1. **新增图形：** 增加封装几何规则的类并注册到工厂；命令继续调用 `Shape`。容器当前基于 `GroupShape`，未来第三方容器出现时再提取容器能力接口。
+2. **新增命令或入口：** CLI 扩展注册表；其他入口复用会话用例。当前创建接口接收文本参数，GUI 出现后再提供类型化创建请求。
+3. **更完整 SVG：** 主要扩展 codec 与模型的表达范围，特别是 transform、字体和 CSS；不能通过简单忽略属性声称支持。
+4. **其他存储：** 实现 `DocumentStore` 并在 main 注入，不改变编辑命令。
+5. **更大文档：** 当前树遍历与局部恢复记录足够；有性能证据后再增加索引、迭代遍历或历史容量限制。
+6. **并发和异步：** 当前同步 CLI 无并发编辑；切换异步 IO 必须同步设计任务顺序和会话版本校验。
 
 ## 过程记录
 
-仓库起初只有实验说明和基础元文件。早期讨论从命令表、错误语义、撤销粒度和后续 `box` 阶段边界提取约束；调研记录保留 SVG 的 ID、容器、文本、命名空间以及 Node/TypeScript 的相关依据。
+早期草案曾将 XML 库节点暴露给领域工厂，并把所有属性放进公共字典。之后确定 XML 数据留在适配层，图形类封装几何字段和不变量。当前工厂放在应用层，导入器与 CLI 共享类型构造。
 
-早期草案曾将 XML 库节点类型暴露给领域工厂，并把所有属性放进公共字典。讨论后决定：未来 codec 隔离 XML 数据类型，图形类封装自己的几何字段及不变量。文件读写的实现仍未完成，这些属于约束而非已交付能力。
+2026-10-21，删除、迁移、排序和创建接入命令总线。测试使用 ID 冲突、失效容器、缺失目标验证失败保持历史。排序恢复原下标，不能简单用相反的 front/back 撤销。
 
-2026-10-21，删除与恢复接入命令总线，随后加入迁移、排序、创建及会话。测试通过真实 ID 冲突、失效父容器、缺失目标验证失败保留历史；混合历史确认排序必须恢复原下标，不能简单执行相反的置顶或置底。
+CLI 进程测试曾发现退出后继续执行缓冲输入；关闭时解除 line 监听后修复，相关测试保留至今。
 
-文档 CLI 接线时，真实进程测试发现退出后仍处理缓冲输入：`close()` 不保证当前批次停止触发 `line`。修复在关闭时解除 REPL 的监听，相关回归测试现已通过。之后接入创建、删除、结构编辑及 `tree/show`，原文档未同步这些进度，本次已纠正。
+2026-10-22，接口复查移除了 `move = prepareMove(...).apply()` 等重复入口，统一准备变更；同时补齐整组缩放原子性和数值溢出/下溢校验。Front/Back 合并为 `ReorderCommand`，会话通用执行方法改为私有，避免为测试保留额外生产入口。
 
-2026-10-22，用户指出新加入 `prepareMove` 后仍保留 `move = prepareMove(...).apply()` 没有实际必要，并要求删除冗余、检查设计。复查确认：先前教学分步演进后未及时收束接口，又用不存在的兼容需求解释重复入口，这个理由不成立。后续按完整业务单元完成接口替换和调用迁移。
+2026-10-23，按以下完整能力分批实现并验证：
 
-本次直接清理了以下问题：
-
-- 删除直接变换入口，调用方统一使用准备变更；同时修复原缩放路径缺少整组原子性、坐标溢出和尺寸下溢校验的问题。
-- 合并 `FrontCommand/BackCommand` 为 `ReorderCommand`，会话对应只保留一个排序用例；删除旧类，不保留别名。
-- 会话通用执行方法改为私有，测试改用公开用例或直接测试命令总线，避免为测试保留额外生产接口。
-- 工厂移入应用层，共享参数解析，领域层不再包含创建命令的文本语法；CLI 单 ID 参数校验也集中处理。
-- `DetachedSubtree` 改名 `ShapeLocation`，统一删除、迁移和排序所使用的位置语义。
-- 移除当前架构中的预设空模块，更新过时的命令、工厂、展示和测试状态；历史草案仍可查阅。
+- 补齐 circle/ellipse/line/text、公共样式、scale/set 和撤销。发现文本内容可以恰好为 `in`，移除把所有末尾 `in` 都判为残缺子句的检查，交给具体创建语法校验。
+- 实现跨容器分组与解组，固定顺序、最近公共父容器和恢复位置的语义。
+- 解组复查发现：若多个属性变更都恢复整份样式快照，后应用的变更会覆盖前一个。改为单属性恢复，并补充同时继承 fill/stroke/stroke-width 的回归测试。
+- 实现存储端口、SVG codec、真实文件适配器、read/save/help。外部 SVG 读入先验证整个新文档，保存采用临时文件替换。
+- 真实 CLI 实验回放的测试在临时目录启动时无法按裸包名找到 tsx。测试启动器改为解析 loader 的绝对 URL，验证从任意工作目录启动程序的场景。
+- 补齐文本与连线的树形展示、可回放示例、依赖方向测试和最终文档。
 
 ## 一致性自查
 
-实际目录与上面的当前架构一致。相对早期方案，未建设 `ShapeService`、独立 `History`、通用 `Result`、每条 CLI 对应的命令类、Provider 层或 IO 空接口；这些不是漏建文件，而是缺少当前职责和调用需求。文件读写等实验功能依然需要后续实现。
+实际目录与本方案一致。相对早期方案，没有引入独立 ShapeService、History、通用 Result、Provider 插件层或每条查询一份命令类。真正出现 IO 需求后才加入 DocumentStore 和 infrastructure；新增共享样式需求后才引入 StyledShape。
 
-| 范围 | 已实现并验证 | 尚未实现或限制 |
-|---|---|---|
-| 图形与文档 | 矩形、组、查找与唯一性、删除恢复、迁移排序、准备平移和缩放 | circle/ellipse/line/text、完整属性、group/ungroup |
-| 应用与 CLI | init/canvas/create/delete/move/addto/front/back/tree/show/undo/redo/exit/quit | scale/set/group/ungroup/read/save/help 等剩余命令 |
-| 历史 | 同步编辑成功提交、失败保持历史、精确恢复几何、文档切换隔离 | 实际 IO 的成功/失败历史语义尚待接线验证 |
-| 领域封装 | 几何字段私有；返回独立数组及属性快照 | 返回的领域对象仍可被直接修改，尚无所有权封装 |
+依赖方向由自动测试检查，领域层不导入 Node、应用、终端或 XML 库。图形类型构造集中在工厂；命令分发集中在注册表；XML 和文件系统不进入领域层。
 
-仍需明确的边界：
+| 验收范围 | 实现与验证 |
+|---|---|
+| 六种图形 | 创建、几何校验、公共样式、各自属性白名单、文本内容 |
+| 文档命令 | init/read/save/canvas、默认路径、成功锁历史、失败保留状态 |
+| 编辑命令 | create/delete/move/scale/set/group/ungroup/addto/front/back |
+| 查看与交互 | tree/show/help、引号、空参数、注释、错误前缀、EOF/exit/quit |
+| 历史 | 每条编辑一个步骤、混合命令恢复、redo 分支、失败不消耗记录 |
+| 文件格式 | 命名空间、缺失/重复 ID、实体转义、CDATA、viewBox、非法 XML 拒绝 |
+| 示例 | 编译产物回放两节点流程图，生成 8 个元素的 SVG |
 
-- `requireDocument()` 返回原文档，`GroupShape.add/remove` 仍公开，类型系统未禁止绕过会话编辑、跨文档共享同一对象。当前 CLI 遵守统一入口；不能声称已实现完整的只读视图或所有权隔离。
-- ID 的非空、无空白检查在创建工厂，文档检查全局唯一性。直接调用图形构造器不经过工厂时，不具有同等输入校验；未来导入路径必须补齐这一边界。
-- `GeometryChange` 的有效期依赖同步提交与逆序撤销约定，不支持任意延迟提交，也不保证处理绕过历史后任意修改子树的情况。
-- 图形类型分派仅在工厂，容器身份检查采用 `instanceof GroupShape`。若未来容器不再基于该类，应结合实际插件需求调整容器接口。
+明确保留的边界：
 
-这些限制已记录，没有为消除尚未出现的调用场景而引入另一套框架。现有内存 CLI 通路的失败原子性和历史行为有测试支持，不能将它扩大为整个实验已经完成。
+- `requireDocument()` 返回原文档，`GroupShape.add/remove` 公开，类型系统未禁止绕过会话编辑或跨文档共享对象。CLI 只走会话用例；不声称提供任意外部直接修改后的历史一致性。
+- 准备变更要求同步提交，历史按逆序撤销，不支持跨任意编辑延迟提交。
+- 当前支持的是实验 SVG 子集，不是通用 SVG 文件的无损编辑器。
+- 未进行浏览器自动化视觉比对、极大文档压力测试或断电恢复测试。
 
 ## 质量保证手段
 
-截至 2026-10-22 的实际验证：
+2026-10-23 的最终验证：
 
 | 命令 | 结果 |
 |---|---|
-| `pnpm.cmd typecheck` | 通过，业务代码无输出类型检查 |
-| `pnpm.cmd typecheck:test` | 通过，测试代码类型检查 |
-| `pnpm.cmd test --test-reporter=tap` | 171 项通过，0 失败，0 跳过 |
+| `pnpm.cmd typecheck` | 业务代码严格类型检查通过 |
+| `pnpm.cmd typecheck:test` | 测试代码严格类型检查通过 |
+| `pnpm.cmd test --test-reporter=dot` | 194 项通过，0 失败 |
+| `pnpm.cmd build` | 编译通过，产物可独立执行 |
+| `cmd /c "node dist/main.js < examples\flowchart.txt"` | 成功生成 `examples/flowchart.svg`，8 个元素 |
+| `git diff --check` | 无空白错误 |
 
-本次保留并迁移原有 159 项测试，补充 12 项回归测试，覆盖：准备阶段不修改状态；后代溢出时整组不提交；缩放尺寸下溢；大数浮点情况下精确恢复；MoveCommand 生命周期与失败后重试；撤销、重做失败保留记录；几何与结构命令混合历史；参数分发及真实 CLI 会话。测试替身也同步新接口，修复此前运行测试通过但测试类型检查失败的问题。
+测试重点是风险行为：后代数值失败时整组不提交、精确浮点恢复、跨父容器撤销保持对象与顺序、多属性继承不覆盖、失败不损伤 redo、ID 分配避开后续显式 ID、XML 注入内容保持为文本、文件保存失败保持原内容，以及 exit 后不再处理缓冲命令。真实进程测试完整回放实验第 6 节，真实文件测试检查路径和 IO 历史锁。
 
-现有测试还覆盖树结构、ID 冲突、原对象身份、历史锁、初始化隔离、分词、错误输出、展示和退出生命周期。静态检查使用严格 TypeScript 配置，配合 `git diff --check` 和 import 审查。当前没有配置 lint 脚本，不将其列为已通过检查。
-
-后续验收仍需覆盖剩余图形与命令、SVG 文件往返读写、缺失 ID 警告、浏览器预览，以及实验规定的完整脚本。每轮以一个完整且可验证的能力或重构为边界推进，正常教学轮次仍由用户输入业务代码、Agent 维护测试；本轮直接修改来自用户明确授权。
+Node.js 实际验证版本为 24.14.0，项目声明支持 Node.js 22 及以上。当前未配置 lint，不将其列为已通过检查。每批功能经过测试后提交，最终本地提交标记 `final`；远程推送由仓库所有者另行处理。
