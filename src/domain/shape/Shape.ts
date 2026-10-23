@@ -24,6 +24,9 @@ export interface Shape {
   /** 计算并校验缩放结果，准备期间不修改任何图形。 */
   prepareScale(factor: number): GeometryChange;
 
+  /** 准备白名单属性变更，撤销时恢复原值或原先未设置的状态。 */
+  prepareSet(attribute: string, value: string): GeometryChange;
+
   /** 按顺序读取直接子节点；叶子返回空数组。 */
   children(): readonly Shape[];
 }

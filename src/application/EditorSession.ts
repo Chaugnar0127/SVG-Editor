@@ -6,6 +6,8 @@ import { DeleteCommand } from "./commands/DeleteCommand.js";
 import { AddToCommand } from "./commands/AddToCommand.js";
 import { ReorderCommand, type OrderEdge } from "./commands/ReorderCommand.js";
 import { MoveCommand } from "./commands/MoveCommand.js";
+import { ScaleCommand } from "./commands/ScaleCommand.js";
+import { SetAttributeCommand } from "./commands/SetAttributeCommand.js";
 
 /** 当前文档与只管理该文档的命令总线。 */
 interface ActiveDocument {
@@ -61,6 +63,14 @@ export class EditorSession {
   /** 将叶子或整组平移作为一个可撤销步骤执行。 */
   public moveShape(id: string, dx: number, dy: number): void {
     this.execute(new MoveCommand(id, dx, dy));
+  }
+
+  public scaleShape(id: string, factor: number): void {
+    this.execute(new ScaleCommand(id, factor));
+  }
+
+  public setAttribute(id: string, attribute: string, value: string): void {
+    this.execute(new SetAttributeCommand(id, attribute, value));
   }
 
   /** 将已有图形或整棵子树追加到目标组。 */

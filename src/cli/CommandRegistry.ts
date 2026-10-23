@@ -24,6 +24,8 @@ export class CommandRegistry {
       ["tree", (args) => this.tree(args)],
       ["show", (args) => this.show(args)],
       ["move", (args) => this.move(args)],
+      ["scale", (args) => this.scale(args)],
+      ["set", (args) => this.set(args)],
       [
         "undo",
         (args) => {
@@ -118,8 +120,6 @@ export class CommandRegistry {
 
       containerId = target;
       parameters = parameters.slice(0, -2);
-    } else if (parameters.at(-1) === "in") {
-      throw new RangeError(`usage: ${usage}`);
     }
 
     this.session.createShape(type, id, parameters, containerId);
@@ -179,6 +179,23 @@ export class CommandRegistry {
       kind: "message",
       text: `shape ${id} moved into g#${containerId}`,
     };
+  }
+
+  private scale(args: readonly string[]): CommandResult {
+    expectCount(args, [2], "scale <id> <factor>");
+    const id = args[0]!;
+    const factor = numberAt(args, 1, "factor");
+    this.session.scaleShape(id, factor);
+    const shape = this.session.requireDocument().require(id);
+    return { kind: "message", text: `${shape.type}#${id} scaled by ${factor}` };
+  }
+
+  private set(args: readonly string[]): CommandResult {
+    expectCount(args, [3], "set <id> <attr> <value>");
+    const [id, attribute, value] = args as readonly [string, string, string];
+    this.session.setAttribute(id, attribute, value);
+    const shape = this.session.requireDocument().require(id);
+    return { kind: "message", text: `${shape.type}#${id} updated: ${attribute}=${JSON.stringify(value)}` };
   }
 
   private front(args: readonly string[]): CommandResult {

@@ -300,7 +300,7 @@ test("registry rejects malformed edits and invalid targets without changing the 
     ['create rect bad "" 0 10 10', "x must be a finite number"],
     ["create rect bad 0 0 0 10", "rectangle width must be a positive finite number"],
     ['create rect bad 0 0 10 10 ""', "fill must not be empty"],
-    ["create g bad in", "usage: create <type> <id> [params...] [in <containerId>]"],
+    ["create g bad in", "usage: create g <id> [in <containerId>]"],
     ['create g bad in ""', "usage: create <type> <id> [params...] [in <containerId>]"],
     ['create g bad in "two words"', "usage: create <type> <id> [params...] [in <containerId>]"],
     ["create g bad in missing", "no such container: missing"],

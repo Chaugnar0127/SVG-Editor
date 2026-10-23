@@ -102,6 +102,7 @@ test("formatters escape whitespace, quotes and backslashes and consume any Shape
     children: () => [],
     prepareMove: () => { throw new Error("display must not move a shape"); },
     prepareScale: () => { throw new Error("display must not scale a shape"); },
+    prepareSet: () => { throw new Error("display must not edit a shape"); },
   };
   document.add(custom);
   const pairs = [

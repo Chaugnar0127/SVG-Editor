@@ -1,19 +1,21 @@
 import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
+import { StyledShape } from "./StyledShape.js";
 
-export class RectShape implements Shape {
-  public readonly type = "rect";
+export class RectShape extends StyledShape implements Shape {
+  public override readonly type = "rect";
   private widthValue: number;
   private heightValue: number;
 
   /** 创建矩形；坐标必须有限，宽高必须为正的有限数。 */
   public constructor(
-    public readonly id: string,
+    id: string,
     private x: number,
     private y: number,
     width: number,
     height: number,
-    private fillValue?: string,
+    fillValue?: string,
   ) {
+    super(id);
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       throw new RangeError("rectangle coordinates must be finite numbers");
     }
@@ -32,6 +34,7 @@ export class RectShape implements Shape {
 
     this.widthValue = width;
     this.heightValue = height;
+    if (fillValue !== undefined) super.prepareSet("fill", fillValue).apply();
   }
 
   /** 返回左上角坐标的副本，修改返回对象不会改变矩形位置。 */
@@ -51,24 +54,24 @@ export class RectShape implements Shape {
 
   /** undefined 表示未显式指定填充色。 */
   public get fill(): string | undefined {
-    return this.fillValue;
+    return super.attributes().fill as string | undefined;
   }
 
   /** 返回独立属性副本；未设置的 fill 不出现在结果中。 */
-  public attributes(): ShapeAttributes {
+  public override attributes(): ShapeAttributes {
     return {
       x: this.x,
       y: this.y,
       width: this.widthValue,
       height: this.heightValue,
-      ...(this.fillValue === undefined ? {} : { fill: this.fillValue }),
+      ...super.attributes(),
     };
   }
 
   /**
    * 准备以原点为基准的位置与尺寸缩放，拒绝溢出及尺寸下溢到零。
    */
-  public prepareScale(factor: number): GeometryChange {
+  public override prepareScale(factor: number): GeometryChange {
     if (!Number.isFinite(factor) || factor <= 0) {
       throw new RangeError("scale factor must be positive");
     }
@@ -94,7 +97,7 @@ export class RectShape implements Shape {
   }
 
   /** 保存原坐标和目标坐标，准备过程不改变矩形。 */
-  public prepareMove(dx: number, dy: number): GeometryChange {
+  public override prepareMove(dx: number, dy: number): GeometryChange {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
       throw new RangeError("move offsets must be finite numbers");
     }
@@ -110,8 +113,22 @@ export class RectShape implements Shape {
   }
 
   /** 矩形是叶子节点，没有子节点。 */
-  public children(): readonly Shape[] {
+  public override children(): readonly Shape[] {
     return [];
+  }
+
+  public override prepareSet(attribute: string, value: string): GeometryChange {
+    if (!["x", "y", "width", "height"].includes(attribute)) {
+      return super.prepareSet(attribute, value);
+    }
+    const next = this.number(value, attribute);
+    if (attribute === "width" || attribute === "height") this.positive(next, attribute);
+    return this.geometryChange(
+      attribute === "x" ? next : this.x,
+      attribute === "y" ? next : this.y,
+      attribute === "width" ? next : this.widthValue,
+      attribute === "height" ? next : this.heightValue,
+    );
   }
 
   /** 平移与缩放共用精确恢复逻辑；传入值已由准备方法完成校验。 */

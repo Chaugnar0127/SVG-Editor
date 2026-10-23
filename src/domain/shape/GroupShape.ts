@@ -1,19 +1,20 @@
 import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
+import { StyledShape } from "./StyledShape.js";
 
-export class GroupShape implements Shape {
-  public readonly type = "g";
+export class GroupShape extends StyledShape implements Shape {
+  public override readonly type = "g";
   private readonly childShapes: Shape[] = [];
 
   /** 创建具有指定 ID 的空组。 */
-  public constructor(public readonly id: string) {}
+  public constructor(id: string) { super(id); }
 
-  /** 组没有独立几何或样式属性。 */
-  public attributes(): ShapeAttributes {
-    return {};
+  /** 组样式保留在容器上，由 SVG 的继承规则作用于后代。 */
+  public override attributes(): ShapeAttributes {
+    return super.attributes();
   }
 
   /** 返回直接子节点数组的副本，避免外部绕过 add/remove 改变成员关系。 */
-  public children(): readonly Shape[] {
+  public override children(): readonly Shape[] {
     return [...this.childShapes];
   }
 
@@ -65,7 +66,7 @@ export class GroupShape implements Shape {
   }
 
   /** 汇集直接子节点的变更，嵌套组通过相同接口递归准备。 */
-  public prepareMove(dx: number, dy: number): GeometryChange {
+  public override prepareMove(dx: number, dy: number): GeometryChange {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
       throw new RangeError("move offsets must be finite numbers");
     }
@@ -76,7 +77,7 @@ export class GroupShape implements Shape {
   }
 
   /** 全部后代准备成功才返回可提交的整组缩放。 */
-  public prepareScale(factor: number): GeometryChange {
+  public override prepareScale(factor: number): GeometryChange {
     if (!Number.isFinite(factor) || factor <= 0) {
       throw new RangeError("scale factor must be positive");
     }

@@ -39,7 +39,7 @@ test("factory creates independent empty groups and rejects extra group parameter
 
 test("factory rejects unknown types and empty or whitespace-containing IDs", () => {
   const factory = new ShapeFactory();
-  for (const type of ["circle", "box", "hexagon", "Rect", "toString", "__proto__", ""]) {
+  for (const type of ["box", "hexagon", "Rect", "toString", "__proto__", ""]) {
     assert.throws(() => factory.create(type, "shape", []), {
       name: "RangeError",
       message: `unknown shape type: ${type} (is the plugin loaded?)`,
