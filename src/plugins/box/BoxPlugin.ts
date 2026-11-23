@@ -33,12 +33,13 @@ class BoxShapeProvider implements ShapeProvider {
   /** 要求读入节点包含派生 ID 与类型完全匹配的矩形和文本。 */
   public read(element: SvgElementData, id: string, children: readonly Shape[]): BoxShape {
     if (!this.canRead(element)) throw new RangeError("invalid box marker");
+    if (element.text.trim().length !== 0) throw new RangeError("unexpected text in <g>");
     const rectangle = children.find((child) => child.id === `${id}-rect`);
     const label = children.find((child) => child.id === `${id}-label`);
     if (rectangle === undefined || label === undefined) {
       throw new RangeError(`invalid box structure: missing required children for ${id}`);
     }
-    const box = new BoxShape(id, rectangle, label, children.filter((child) => child !== rectangle && child !== label));
+    const box = new BoxShape(id, rectangle, label, children);
     for (const [name, value] of Object.entries(element.attributes)) {
       if (name !== this.readMarker.attribute) box.prepareSet(name, value).apply();
     }

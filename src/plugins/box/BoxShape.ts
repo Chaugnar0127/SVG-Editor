@@ -10,7 +10,7 @@ export class BoxShape extends GroupShape {
     id: string,
     private readonly rectangleShape: Shape,
     private readonly labelShape: Shape,
-    additionalChildren: readonly Shape[] = [],
+    children?: readonly Shape[],
   ) {
     super(id);
     if (rectangleShape.id !== `${id}-rect` || rectangleShape.type !== "rect") {
@@ -19,9 +19,11 @@ export class BoxShape extends GroupShape {
     if (labelShape.id !== `${id}-label` || labelShape.type !== "text") {
       throw new RangeError(`invalid box structure: expected text#${id}-label`);
     }
-    super.add(rectangleShape);
-    super.add(labelShape);
-    for (const child of additionalChildren) super.add(child);
+    const orderedChildren = children ?? [rectangleShape, labelShape];
+    if (!orderedChildren.includes(rectangleShape) || !orderedChildren.includes(labelShape)) {
+      throw new RangeError(`invalid box structure: missing required children for ${id}`);
+    }
+    for (const child of orderedChildren) super.add(child);
   }
 
   public get rectangle(): Shape { return this.rectangleShape; }
