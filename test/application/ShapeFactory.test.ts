@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ShapeFactory } from "../../src/application/ShapeFactory.js";
+import { createTestExtensions } from "../support/plugins.js";
 import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 
 test("factory preserves rectangle geometry and optional fill without changing input parameters", () => {
-  const factory = new ShapeFactory();
+  const factory = new ShapeFactory(createTestExtensions());
   for (const fill of [undefined, "#4a90d9", "none", "rgb(10 20 30)"]) {
     const parameters = Object.freeze([
       "-10.5", "2e1", "100.25", "50", ...(fill === undefined ? [] : [fill]),
@@ -25,7 +26,7 @@ test("factory preserves rectangle geometry and optional fill without changing in
 });
 
 test("factory creates independent empty groups and rejects extra group parameters", () => {
-  const factory = new ShapeFactory();
+  const factory = new ShapeFactory(createTestExtensions());
   const first = factory.create("g", "in", Object.freeze([]));
   const second = factory.create("g", "in", []);
   assert.ok(first instanceof GroupShape);
@@ -38,7 +39,7 @@ test("factory creates independent empty groups and rejects extra group parameter
 });
 
 test("factory rejects unknown types and empty or whitespace-containing IDs", () => {
-  const factory = new ShapeFactory();
+  const factory = new ShapeFactory(createTestExtensions());
   for (const type of ["box", "hexagon", "Rect", "toString", "__proto__", ""]) {
     assert.throws(() => factory.create(type, "shape", []), {
       name: "RangeError",
@@ -55,7 +56,7 @@ test("factory rejects unknown types and empty or whitespace-containing IDs", () 
 });
 
 test("factory rejects partial or non-finite numeric tokens at every rectangle coordinate and dimension", () => {
-  const factory = new ShapeFactory();
+  const factory = new ShapeFactory(createTestExtensions());
   for (const [index, label] of ["x", "y", "width", "height"].entries()) {
     for (const invalid of ["", " ", "10px", "NaN", "Infinity", "-Infinity", "1e309"]) {
       const parameters = ["10", "20", "100", "50"];
@@ -68,7 +69,7 @@ test("factory rejects partial or non-finite numeric tokens at every rectangle co
 });
 
 test("factory rejects invalid rectangle arity, non-positive dimensions and blank fill", () => {
-  const factory = new ShapeFactory();
+  const factory = new ShapeFactory(createTestExtensions());
   for (const parameters of [[], ["0", "0", "10"], ["0", "0", "10", "10", "red", "extra"]]) {
     assert.throws(() => factory.create("rect", "shape", parameters), {
       message: "usage: create rect <id> <x> <y> <w> <h> [fill] [in <containerId>]",

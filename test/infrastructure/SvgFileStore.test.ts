@@ -3,13 +3,12 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { EditorSession } from "../../src/application/EditorSession.js";
-import { SvgFileStore } from "../../src/infrastructure/SvgFileStore.js";
+import { createTestSession, createTestFileStore } from "../support/plugins.js";
 
 test("real file save/read establishes a default path, locks history and preserves failures", (t) => {
   const directory = mkdtempSync(join(tmpdir(), "svg-editor-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const session = new EditorSession(new SvgFileStore());
+  const session = createTestSession(createTestFileStore());
   session.init();
   assert.throws(() => session.save(), /no file path/u);
   session.createShape("text", "t", ["10", "20", "开始 & 结束"]);
@@ -48,7 +47,7 @@ test("failed serialization never overwrites an existing file or locks edit histo
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const file = join(directory, "original.svg");
   writeFileSync(file, "original contents");
-  const session = new EditorSession(new SvgFileStore());
+  const session = createTestSession(createTestFileStore());
   session.init();
   session.createShape("text", "t", ["0", "0", "\u0000"]);
   assert.throws(() => session.save(file), /forbidden in XML/u);

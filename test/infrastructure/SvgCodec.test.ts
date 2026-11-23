@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EditorSession } from "../../src/application/EditorSession.js";
-import { SvgCodec } from "../../src/infrastructure/SvgCodec.js";
 import { Formatters } from "../../src/presentation/Formatters.js";
+import { createTestCodec, createTestExtensions, createTestSession } from "../support/plugins.js";
 
-const codec = new SvgCodec();
+const extensions = createTestExtensions();
+const codec = createTestCodec(extensions);
 const wrap = (body: string, extra = ""): string => `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" ${extra}>${body}</svg>`;
 
 test("SVG round trip preserves six types, nesting, order, styles, text and custom viewBox", () => {
@@ -68,7 +68,7 @@ test("malformed or unsupported SVG is rejected instead of producing a partial do
 });
 
 test("encoding escapes text and IDs without adding elements, and rejects invalid XML characters", () => {
-  const session = new EditorSession();
+  const session = createTestSession(undefined, extensions);
   session.init();
   session.createShape("text", 'a&"<>', ["0", "1", '</text><g id="injected"/> & 中文']);
   const copy = codec.decode(codec.encode(session.requireDocument())).document;

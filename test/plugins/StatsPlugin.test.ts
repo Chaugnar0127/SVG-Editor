@@ -1,14 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ExtensionRegistry } from "../../src/application/extensions/ExtensionRegistry.js";
-import { EditorSession } from "../../src/application/EditorSession.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import statsPlugin from "../../src/plugins/stats/StatsPlugin.js";
+import { createTestExtensions, createTestSession } from "../support/plugins.js";
 
 function setup() {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(statsPlugin), { success: true });
-  const session = new EditorSession();
+  const extensions = createTestExtensions([statsPlugin]);
+  const session = createTestSession(undefined, extensions);
   return { session, commands: new CommandRegistry(session, extensions) };
 }
 

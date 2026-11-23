@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EditorSession } from "../../src/application/EditorSession.js";
+import { createTestSession } from "../support/plugins.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import { Tokenizer } from "../../src/cli/Tokenizer.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 
 function populatedSession() {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init(400, 300);
   session.createShape("rect", "first", ["10", "20", "30", "40"]);
   session.createShape("rect", "second", ["0", "0", "10", "10"]);
@@ -17,7 +17,7 @@ function populatedSession() {
 }
 
 function structureSession(nested: boolean) {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init();
   if (nested) session.createShape("g", "scene", []);
   const parent = nested ? "scene" : undefined;
@@ -66,7 +66,7 @@ test("move dispatch validates parameters and rejected edits preserve redo", () =
 });
 
 test("registry ignores empty input and rejects unknown or differently cased command names", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const registry = new CommandRegistry(session);
   assert.equal(registry.execute([]), undefined);
   for (const name of ["unknown", "INIT", "toString", "__proto__", ""]) {
@@ -80,7 +80,7 @@ test("registry ignores empty input and rejects unknown or differently cased comm
 });
 
 test("registry initializes canvases with zero, one or two dimensions without mutating input tokens", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const registry = new CommandRegistry(session);
   const cases = [
     { tokens: ["init"], width: 800, height: 600 },
@@ -104,7 +104,7 @@ test("registry initializes canvases with zero, one or two dimensions without mut
 });
 
 test("registry forwards missing-document errors while allowing exit before initialization", () => {
-  const registry = new CommandRegistry(new EditorSession());
+  const registry = new CommandRegistry(createTestSession());
   for (const tokens of [
     ["canvas"], ["canvas", "400", "300"], ["undo"], ["redo"],
     ["addto", "group", "shape"], ["front", "shape"], ["back", "shape"],
@@ -218,7 +218,7 @@ test("registry init replaces the current document and binds later history to the
 });
 
 test("tokenizer and registry preserve empty numeric arguments and reject incomplete quoted commands", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const registry = new CommandRegistry(session);
   const tokenizer = new Tokenizer();
   const execute = (line: string) => registry.execute(tokenizer.tokenize(line));
@@ -234,7 +234,7 @@ test("tokenizer and registry preserve empty numeric arguments and reject incompl
 });
 
 test("registry creates root and nested shapes, preserves quoted fill, and treats an ID named in as data", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const registry = new CommandRegistry(session);
   const tokenizer = new Tokenizer();
   const execute = (line: string) => registry.execute(Object.freeze(tokenizer.tokenize(line)));
@@ -514,7 +514,7 @@ test("successful and failed display queries preserve both history stacks and ori
 });
 
 test("display queries preserve the IO history lock for empty and populated canvases", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const registry = new CommandRegistry(session);
   registry.execute(["init"]);
   assert.deepEqual(registry.execute(["tree"]), { kind: "message", text: "svg (800x600)" });

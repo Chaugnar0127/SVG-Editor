@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DocumentStore } from "../../src/application/DocumentStore.js";
-import { ExtensionRegistry } from "../../src/application/extensions/ExtensionRegistry.js";
-import { EditorSession } from "../../src/application/EditorSession.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import type { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import modifiedStarPlugin from "../../src/plugins/tree/ModifiedStarPlugin.js";
+import { createTestExtensions, createTestSession } from "../support/plugins.js";
 
 const store: DocumentStore = {
   read: () => { throw new Error("not used"); },
@@ -13,9 +12,8 @@ const store: DocumentStore = {
 };
 
 test("modified-star marks new nodes, compares subtrees to save point, and clears after undo", () => {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(modifiedStarPlugin), { success: true });
-  const session = new EditorSession(store, extensions);
+  const extensions = createTestExtensions([modifiedStarPlugin]);
+  const session = createTestSession(store, extensions);
   const commands = new CommandRegistry(session, extensions);
   session.init();
   const cleanEmptyTree = commands.execute(["tree"]);

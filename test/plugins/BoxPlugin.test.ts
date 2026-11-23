@@ -8,11 +8,11 @@ import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import { Formatters } from "../../src/presentation/Formatters.js";
 import boxPlugin from "../../src/plugins/box/BoxPlugin.js";
 import { SvgCodec } from "../../src/infrastructure/SvgCodec.js";
+import { createTestExtensions, createTestSession, createTestCodec } from "../support/plugins.js";
 
 test("box is an atomic composite container with reversible fill and label attributes", () => {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(boxPlugin), { success: true });
-  const session = new EditorSession(undefined, extensions);
+  const extensions = createTestExtensions([boxPlugin]);
+  const session = createTestSession(undefined, extensions);
   const commands = new CommandRegistry(session, extensions);
   session.init();
   assert.deepEqual(commands.execute(["create", "box", "n1", "120", "100", "160", "60", "Start"]), {
@@ -55,9 +55,8 @@ test("box is an atomic composite container with reversible fill and label attrib
 });
 
 test("box moves as a nested composite and serializes with a marker that controls readback", () => {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(boxPlugin), { success: true });
-  const session = new EditorSession(undefined, extensions);
+  const extensions = createTestExtensions([boxPlugin]);
+  const session = createTestSession(undefined, extensions);
   session.init();
   session.createShape("g", "scene", []);
   session.createShape("box", "nested", ["1", "2", "30", "20", "Label"], "scene");
@@ -73,22 +72,21 @@ test("box moves as a nested composite and serializes with a marker that controls
   assert.equal(loaded.require("nested").type, "box");
   assert.equal(loaded.require("nested-label").attributes().text, "Label");
 
-  const plainCodec = new SvgCodec();
+  const plainCodec = createTestCodec();
   const downgraded = plainCodec.decode(source).document.require("nested");
   assert.equal(downgraded.type, "g");
   assert.deepEqual(downgraded.children().map(({ id }) => id), ["nested-rect", "nested-label"]);
 });
 
 test("malformed box input rejects the read without replacing the active document", () => {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(boxPlugin), { success: true });
+  const extensions = createTestExtensions([boxPlugin]);
   const malformed = '<svg xmlns="http://www.w3.org/2000/svg"><g id="broken" data-kind="box"><rect id="broken-rect" x="0" y="0" width="10" height="10" /></g></svg>';
   const codec = new SvgCodec(new ShapeFactory(extensions));
   const store: DocumentStore = {
     read: () => codec.decode(malformed),
     write: () => {},
   };
-  const session = new EditorSession(store, extensions);
+  const session = createTestSession(store, extensions);
   session.init();
   session.createShape("rect", "retained", ["0", "0", "10", "10"]);
   const activeDocument = session.requireDocument();

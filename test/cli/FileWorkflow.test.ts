@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { SvgCodec } from "../../src/infrastructure/SvgCodec.js";
+import { createTestCodec } from "../support/plugins.js";
 
 test("lab transcript runs through real CLI, saves browser SVG and reads missing IDs", (t) => {
   const directory = mkdtempSync(join(tmpdir(), "svg-editor-cli-"));
@@ -37,7 +37,7 @@ test("lab transcript runs through real CLI, saves browser SVG and reads missing 
   assert.match(output, /error: cannot read file: missing.svg/u);
   assert.equal(output.match(/error: undo not allowed after io command/gu)?.length, 2);
   assert.doesNotMatch(output, /canvas 1x1/u);
-  const codec = new SvgCodec();
+  const codec = createTestCodec();
   const saved = codec.decode(readFileSync(join(directory, "demo with spaces.svg"), "utf8")).document;
   assert.equal(saved.require("title").attributes().text, "My Diagram");
   assert.equal(saved.require("c1").attributes().cx, 130);

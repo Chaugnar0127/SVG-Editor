@@ -4,11 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import type { DirectoryEntry, DirectoryReader } from "../../src/application/DirectoryReader.js";
-import { ExtensionRegistry } from "../../src/application/extensions/ExtensionRegistry.js";
-import { EditorSession } from "../../src/application/EditorSession.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import { NodeDirectoryReader } from "../../src/infrastructure/NodeDirectoryReader.js";
 import dirPlugin from "../../src/plugins/dir/DirPlugin.js";
+import { createTestExtensions, createTestSession } from "../support/plugins.js";
 
 class FakeDirectoryReader implements DirectoryReader {
   public constructor(
@@ -24,9 +23,8 @@ class FakeDirectoryReader implements DirectoryReader {
 }
 
 function setup(reader: DirectoryReader) {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(dirPlugin), { success: true });
-  const session = new EditorSession();
+  const extensions = createTestExtensions([dirPlugin]);
+  const session = createTestSession(undefined, extensions);
   return { session, commands: new CommandRegistry(session, extensions, reader) };
 }
 

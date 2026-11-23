@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EditorSession } from "../../src/application/EditorSession.js";
+import { createTestSession } from "../support/plugins.js";
+import type { EditorSession } from "../../src/application/EditorSession.js";
 import { RectShape } from "../../src/domain/shape/RectShape.js";
 
 function createRect(session: EditorSession, id: string, x: number, y: number, width: number, height: number): RectShape {
@@ -20,7 +21,7 @@ function assertHistoryLocked(session: EditorSession): void {
 }
 
 test("an uninitialized session rejects document operations and allows initialization afterwards", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const operations = [
     () => session.requireDocument(),
     () => session.resizeCanvas(400, 300),
@@ -53,7 +54,7 @@ test("an uninitialized session rejects document operations and allows initializa
 });
 
 test("init creates an empty canvas with independent defaults and locks history", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const cases = [
     [undefined, undefined, 800, 600],
     [320.5, 240.25, 320.5, 240.25],
@@ -71,7 +72,7 @@ test("init creates an empty canvas with independent defaults and locks history",
 });
 
 test("failed reinitialization preserves the original document and both undo and redo records", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init(400, 300);
   const document = session.requireDocument();
   const first = createRect(session, "first", 10, 20, 30, 40);
@@ -97,7 +98,7 @@ test("failed reinitialization preserves the original document and both undo and 
 });
 
 test("successful reinitialization replaces the document and never revives old history", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init();
   const oldDocument = session.requireDocument();
   const oldShape = createRect(session, "shape", 10, 20, 30, 40);
@@ -128,7 +129,7 @@ test("successful reinitialization replaces the document and never revives old hi
 });
 
 test("successful canvas resize keeps the tree but clears both histories until a successful edit", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init(400, 300);
   const document = session.requireDocument();
   session.createShape("g", "group", []);
@@ -165,7 +166,7 @@ test("successful canvas resize keeps the tree but clears both histories until a 
 });
 
 test("failed canvas resize preserves both dimensions, both histories and the current document", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init(400, 300);
   const document = session.requireDocument();
   const first = createRect(session, "first", 0, 0, 10, 10);
@@ -190,7 +191,7 @@ test("failed canvas resize preserves both dimensions, both histories and the cur
 });
 
 test("queries and failed document operations preserve an existing history lock", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init(400, 300);
   const document = session.requireDocument();
   assert.equal(session.requireDocument().width, 400);
@@ -219,8 +220,8 @@ test("queries and failed document operations preserve an existing history lock",
 });
 
 test("sessions with identical IDs keep document replacement, canvas changes and histories isolated", () => {
-  const first = new EditorSession();
-  const second = new EditorSession();
+  const first = createTestSession();
+  const second = createTestSession();
   first.init(400, 300);
   second.init(200, 100);
   createRect(first, "shape", 10, 20, 30, 40);
@@ -242,7 +243,7 @@ test("sessions with identical IDs keep document replacement, canvas changes and 
 });
 
 test("session creation and deletion preserve original nested objects, fill and sibling order across history", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init();
   session.createShape("g", "scene", []);
   session.createShape("rect", "before", ["0", "0", "10", "10"], "scene");

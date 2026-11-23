@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EditorSession } from "../../src/application/EditorSession.js";
+import { createTestSession } from "../support/plugins.js";
+import type { EditorSession } from "../../src/application/EditorSession.js";
 import { Formatters } from "../../src/presentation/Formatters.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 
 function scene(): EditorSession {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init();
   session.createShape("g", "scene", []);
   for (const id of ["left", "right"]) {

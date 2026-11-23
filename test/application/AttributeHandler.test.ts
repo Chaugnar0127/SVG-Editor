@@ -4,15 +4,14 @@ import { ExtensionRegistry } from "../../src/application/extensions/ExtensionReg
 import type { AttributeHandler, Plugin } from "../../src/application/extensions/PluginContracts.js";
 import { EditorSession } from "../../src/application/EditorSession.js";
 import type { GeometryChange, Shape } from "../../src/domain/shape/Shape.js";
+import { createTestExtensions } from "../support/plugins.js";
 
 function installHandlers(handlers: readonly AttributeHandler[]): ExtensionRegistry {
-  const extensions = new ExtensionRegistry();
   const plugin: Plugin = {
     manifest: { name: "attribute-test", contributes: { attributes: handlers.map(({ name }) => name) } },
     activate: (context) => handlers.forEach((handler) => context.registerAttributeHandler(handler)),
   };
-  assert.deepEqual(extensions.install(plugin), { success: true });
-  return extensions;
+  return createTestExtensions([plugin]);
 }
 
 function handler(name: string, attribute: string, prepare: AttributeHandler["prepare"]): AttributeHandler {

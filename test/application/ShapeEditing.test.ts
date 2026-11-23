@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EditorSession } from "../../src/application/EditorSession.js";
 import { ShapeFactory } from "../../src/application/ShapeFactory.js";
+import { createTestExtensions, createTestSession } from "../support/plugins.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import { Tokenizer } from "../../src/cli/Tokenizer.js";
 
@@ -14,7 +14,7 @@ const cases = [
 
 for (const { type, args, scaled, moved } of cases) {
   test(`${type} moves and scales with exact undo and unchanged style/content`, () => {
-    const session = new EditorSession();
+    const session = createTestSession();
     session.init();
     session.createShape(type, "a", args);
     const shape = session.requireDocument().require("a");
@@ -36,7 +36,7 @@ for (const { type, args, scaled, moved } of cases) {
 }
 
 test("set validates per-shape attributes and restores absence of style through mixed history", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init();
   session.createShape("g", "scene", []);
   for (const { type, args } of cases) session.createShape(type, type, args, "scene");
@@ -62,7 +62,7 @@ test("set validates per-shape attributes and restores absence of style through m
 });
 
 test("invalid attributes and late-child overflow preserve document and redo branch", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   session.init();
   session.createShape("g", "scene", []);
   session.createShape("text", "first", ["1", "2", "ok"], "scene");
@@ -92,7 +92,7 @@ test("invalid attributes and late-child overflow preserve document and redo bran
 });
 
 test("all numeric fields enforce finite values and positive radii during creation", () => {
-  const factory = new ShapeFactory();
+  const factory = new ShapeFactory(createTestExtensions());
   for (const { type, args } of cases) {
     const count = type === "text" ? 2 : type === "circle" ? 3 : 4;
     for (let i = 0; i < count; i++) {
@@ -108,7 +108,7 @@ test("all numeric fields enforce finite values and positive radii during creatio
 });
 
 test("CLI accepts text equal to in and routes scale/set without treating text as a clause", () => {
-  const session = new EditorSession();
+  const session = createTestSession();
   const registry = new CommandRegistry(session);
   const tokenizer = new Tokenizer();
   for (const line of ['init', 'create g scene', 'create text t 1 2 "in"',
