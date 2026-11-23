@@ -66,6 +66,28 @@ test("requireContainer returns original groups at any depth and distinguishes lo
   assert.strictEqual(inner.children()[0], leaf);
 });
 
+test("group preparation rejects protected children before detaching any selected sibling", () => {
+  class ProtectedGroup extends GroupShape {
+    public override canModifyChild(id: string): boolean {
+      return id !== "protected" && super.canModifyChild(id);
+    }
+  }
+
+  const document = new SvgDocument();
+  const ordinary = new RectShape("ordinary", 0, 0, 10, 10);
+  const protectedChild = new RectShape("protected", 0, 0, 10, 10);
+  const parent = new ProtectedGroup("parent");
+  parent.add(ordinary);
+  parent.add(protectedChild);
+  document.add(parent);
+
+  assert.throws(() => document.prepareGroup(new GroupShape("combined"), ["ordinary", "protected"]), {
+    message: "cannot modify required child: protected",
+  });
+  assert.deepEqual(parent.children(), [ordinary, protectedChild]);
+  assert.equal(document.find("combined"), undefined);
+});
+
 test("document inserts new subtrees at each position in a nested group", () => {
   const document = new SvgDocument();
   const outer = new GroupShape("outer");

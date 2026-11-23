@@ -273,6 +273,11 @@ export class SvgDocument {
       }
     };
     visit(this.rootShapes, null);
+    for (const location of locations) {
+      if (location.parent !== null && !location.parent.canModifyChild(location.shape.id)) {
+        throw new RangeError(`cannot modify required child: ${location.shape.id}`);
+      }
+    }
 
     const ancestry = (parent: ContainerShape | null): (ContainerShape | null)[] => {
       const chain: (ContainerShape | null)[] = [];
