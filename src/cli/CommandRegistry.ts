@@ -287,7 +287,7 @@ export class CommandRegistry {
 
     return {
       kind: "message",
-      text: this.formatters.tree(document, args[0]),
+      text: this.formatters.tree(document, args[0], this.extensions.treeDecorators()),
     };
   }
 

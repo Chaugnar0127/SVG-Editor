@@ -1,6 +1,8 @@
 import type { DirectoryReader } from "../DirectoryReader.js";
 import type { SvgDocument } from "../../domain/document/SvgDocument.js";
 import type { GeometryChange, Shape } from "../../domain/shape/Shape.js";
+import type { TreeDecorator } from "../../domain/TreeDecorator.js";
+export type { TreeDecorationTarget, TreeDecorator } from "../../domain/TreeDecorator.js";
 
 export type CommandResult =
   | { readonly kind: "message"; readonly text: string }
@@ -40,16 +42,6 @@ export interface AttributeHandler {
   readonly name: string;
   handles(shape: Shape, attribute: string): boolean;
   prepare(shape: Shape, attribute: string, value: string): GeometryChange;
-}
-
-export interface TreeDecorationTarget {
-  readonly shape: Shape | undefined;
-  readonly documentRoot: boolean;
-}
-
-export interface TreeDecorator {
-  readonly name: string;
-  decorate(target: TreeDecorationTarget): readonly string[];
 }
 
 export interface PluginContributions {

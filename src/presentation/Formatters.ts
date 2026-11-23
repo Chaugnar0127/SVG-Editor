@@ -1,5 +1,6 @@
 import type { SvgDocument } from "../domain/document/SvgDocument.js";
 import type { Shape } from "../domain/shape/Shape.js";
+import type { TreeDecorationTarget, TreeDecorator } from "../domain/TreeDecorator.js";
 
 const treeAttributeNames: ReadonlyMap<string, string> = new Map([
   ["width", "w"],
@@ -8,18 +9,20 @@ const treeAttributeNames: ReadonlyMap<string, string> = new Map([
 
 export class Formatters {
   /** 展示全文档或指定子树，保持模型中的节点顺序。 */
-  public tree(document: SvgDocument, id?: string): string {
+  public tree(document: SvgDocument, id?: string, decorators: readonly TreeDecorator[] = []): string {
     const root = id === undefined ? undefined : document.require(id);
 
     const lines = [
       root === undefined
-        ? `svg (${document.width}x${document.height})`
-        : this.describe(root),
+        ? `svg (${document.width}x${document.height})${this.decoration(decorators, {
+          key: "document:root", signature: this.documentSignature(document), shape: undefined, documentRoot: true,
+        })}`
+        : `${this.describe(root)}${this.decoration(decorators, this.shapeTarget(root))}`,
     ];
 
     const children = root === undefined ? document.topLevel() : root.children();
 
-    this.appendChildren(lines, children, "");
+    this.appendChildren(lines, children, "", decorators);
 
     return lines.join("\n");
   }
@@ -40,17 +43,43 @@ export class Formatters {
     lines: string[],
     children: readonly Shape[],
     prefix: string,
+    decorators: readonly TreeDecorator[],
   ): void {
     for (const [index, child] of children.entries()) {
       const isLast = index === children.length - 1;
       const branch = isLast ? "└── " : "├── ";
 
-      lines.push(`${prefix}${branch}${this.describe(child)}`);
+      lines.push(`${prefix}${branch}${this.describe(child)}${this.decoration(decorators, this.shapeTarget(child))}`);
 
       const childPrefix = prefix + (isLast ? "    " : "│   ");
 
-      this.appendChildren(lines, child.children(), childPrefix);
+      this.appendChildren(lines, child.children(), childPrefix, decorators);
     }
+  }
+
+  private decoration(decorators: readonly TreeDecorator[], target: TreeDecorationTarget): string {
+    const labels = decorators.flatMap((decorator) => decorator.decorate(target));
+    return labels.length === 0 ? "" : ` ${labels.join(" ")}`;
+  }
+
+  private shapeTarget(shape: Shape): TreeDecorationTarget {
+    return {
+      key: `shape:${shape.id}`,
+      signature: this.shapeSignature(shape),
+      shape,
+      documentRoot: false,
+    };
+  }
+
+  private shapeSignature(shape: Shape): string {
+    return JSON.stringify([shape.id, shape.type, shape.attributes(), shape.children().map((child) => this.shapeSignature(child))]);
+  }
+
+  private documentSignature(document: SvgDocument): string {
+    return JSON.stringify([
+      document.width, document.height, document.viewBox,
+      document.topLevel().map((shape) => this.shapeSignature(shape)),
+    ]);
   }
 
   private describe(shape: Shape): string {

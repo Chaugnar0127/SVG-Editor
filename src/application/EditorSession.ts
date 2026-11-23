@@ -11,6 +11,7 @@ import { SetAttributeCommand } from "./commands/SetAttributeCommand.js";
 import { GroupCommand } from "./commands/GroupCommand.js";
 import { UngroupCommand } from "./commands/UngroupCommand.js";
 import type { DocumentStore } from "./DocumentStore.js";
+import { ExtensionRegistry } from "./extensions/ExtensionRegistry.js";
 
 /** 当前文档与只管理该文档的命令总线。 */
 interface ActiveDocument {
@@ -23,7 +24,10 @@ export class EditorSession {
   private readonly shapeFactory = new ShapeFactory();
   private current: ActiveDocument | undefined;
 
-  public constructor(private readonly store?: DocumentStore) {}
+  public constructor(
+    private readonly store?: DocumentStore,
+    private readonly extensions: ExtensionRegistry = new ExtensionRegistry(),
+  ) {}
 
   /** 新文档创建成功后，再整体替换当前文档及其历史。 */
   public init(width: number = 800, height: number = 600): void {
@@ -33,6 +37,7 @@ export class EditorSession {
     commands.lockAfterIO();
 
     this.current = { document, commands };
+    this.markDecoratorsSaved(document);
   }
 
   /** 获取当前文档，供尺寸查询和展示使用；编辑通过会话用例提交。 */
@@ -51,6 +56,7 @@ export class EditorSession {
     const commands = new CommandBus(loaded.document);
     commands.lockAfterIO();
     this.current = { document: loaded.document, commands, path };
+    this.markDecoratorsSaved(loaded.document);
     return loaded.warnings;
   }
 
@@ -64,6 +70,7 @@ export class EditorSession {
     this.requireStore().write(destination, current.document);
     current.path = destination;
     current.commands.lockAfterIO();
+    this.markDecoratorsSaved(current.document);
     return destination;
   }
 
@@ -153,5 +160,10 @@ export class EditorSession {
   private requireStore(): DocumentStore {
     if (this.store === undefined) throw new Error("document store is not configured");
     return this.store;
+  }
+
+  /** 各装饰器保存自己的快照，供之后的树渲染比较当前内容。 */
+  private markDecoratorsSaved(document: SvgDocument): void {
+    for (const decorator of this.extensions.treeDecorators()) decorator.onSaved?.(document);
   }
 }
