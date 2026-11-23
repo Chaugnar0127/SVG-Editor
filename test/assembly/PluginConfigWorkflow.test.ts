@@ -30,6 +30,7 @@ test("CLI config mode loads configured plugins and keeps default shapes availabl
   }));
   const result = spawnSync(process.execPath, [
     "--import", import.meta.resolve("tsx"), fileURLToPath(new URL("../../src/main.ts", import.meta.url)),
+    "--config", "plugins.config.json",
   ], {
     cwd: directory,
     input: ["init", "create rect sample 0 0 10 10", "greet", "stats", "quit", ""].join("\n"),
@@ -53,6 +54,7 @@ test("invalid config starts with base capabilities and reports one error", (t) =
   writeFileSync(join(directory, "plugins.config.json"), '{"plugins":[{"module":42}]}');
   const result = spawnSync(process.execPath, [
     "--import", import.meta.resolve("tsx"), fileURLToPath(new URL("../../src/main.ts", import.meta.url)),
+    "--config", "plugins.config.json",
   ], {
     cwd: directory,
     input: ["init", "create rect sample 0 0 10 10", "stats", "quit", ""].join("\n"),

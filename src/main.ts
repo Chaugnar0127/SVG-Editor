@@ -17,9 +17,18 @@ const loader = new PluginLoader(extensions);
 const baseFailure = loader.install(builtinShapesPlugin);
 if (baseFailure !== undefined) throw new Error(baseFailure);
 
-const configPath = resolve(process.cwd(), "plugins.config.json");
+const startupArguments = process.argv.slice(2);
+const explicitConfig = startupArguments.length === 2
+  && startupArguments[0] === "--config"
+  && startupArguments[1]!.trim().length > 0;
+const invalidStartupArguments = startupArguments.length > 0 && !explicitConfig;
+const configPath = explicitConfig
+  ? resolve(process.cwd(), startupArguments[1]!)
+  : resolve(process.cwd(), "plugins.config.json");
 let pluginErrors: readonly string[];
-if (existsSync(configPath)) {
+if (invalidStartupArguments) {
+  pluginErrors = ["error: invalid plugin config"];
+} else if (explicitConfig || existsSync(configPath)) {
   pluginErrors = await loader.loadConfig(configPath);
 } else {
   const defaults = [
