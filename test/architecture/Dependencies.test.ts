@@ -9,6 +9,7 @@ test("module imports follow the documented dependency direction", () => {
   const allowed: Record<string, readonly string[]> = {
     domain: ["domain"], application: ["application", "domain"],
     presentation: ["presentation", "domain"], cli: ["cli", "application", "presentation"],
+    plugins: ["plugins", "application", "domain"],
     infrastructure: ["infrastructure", "application", "domain"],
   };
   const check = (directory: string): void => {

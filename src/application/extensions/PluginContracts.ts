@@ -26,7 +26,7 @@ export interface ShapeProvider {
 
 export interface PluginCommandContext {
   getDocument(): SvgDocument | undefined;
-  readonly directoryReader: DirectoryReader;
+  readonly directoryReader?: DirectoryReader;
 }
 
 export interface PluginCommand {

@@ -40,6 +40,11 @@ export class EditorSession {
     return this.requireCurrent().document;
   }
 
+  /** 返回当前文档的只读访问入口；尚未初始化时返回 undefined。 */
+  public getDocument(): SvgDocument | undefined {
+    return this.current?.document;
+  }
+
   /** 解析和模型校验全部成功后，才替换文档、路径及历史。 */
   public read(path: string): readonly string[] {
     const loaded = this.requireStore().read(path);

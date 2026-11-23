@@ -1,10 +1,12 @@
 import type { EditorSession } from "../application/EditorSession.js";
 import { expectCount, numberAt } from "../application/arguments.js";
 import { Formatters } from "../presentation/Formatters.js";
+import { ExtensionRegistry } from "../application/extensions/ExtensionRegistry.js";
+import type { PluginCommandContext } from "../application/extensions/PluginContracts.js";
+import type { DirectoryReader } from "../application/DirectoryReader.js";
 
-export type CommandResult =
-  | { readonly kind: "message"; readonly text: string }
-  | { readonly kind: "exit" };
+export type { CommandResult } from "../application/extensions/PluginContracts.js";
+import type { CommandResult } from "../application/extensions/PluginContracts.js";
 
 type CommandHandler = (args: readonly string[]) => CommandResult;
 
@@ -12,7 +14,11 @@ export class CommandRegistry {
   private readonly formatters = new Formatters();
   private readonly handlers: ReadonlyMap<string, CommandHandler>;
 
-  public constructor(private readonly session: EditorSession) {
+  public constructor(
+    private readonly session: EditorSession,
+    private readonly extensions: ExtensionRegistry = new ExtensionRegistry(),
+    private readonly directoryReader?: DirectoryReader,
+  ) {
     this.handlers = new Map<string, CommandHandler>([
       ["init", (args) => this.init(args)],
       ["canvas", (args) => this.canvas(args)],
@@ -62,11 +68,11 @@ export class CommandRegistry {
 
     const handler = this.handlers.get(name);
 
-    if (handler === undefined) {
-      throw new RangeError(`unknown command: ${name}`);
-    }
+    if (handler !== undefined) return handler(tokens.slice(1));
 
-    return handler(tokens.slice(1));
+    const pluginCommand = this.extensions.command(name);
+    if (pluginCommand === undefined) throw new RangeError(`unknown command: ${name}`);
+    return pluginCommand.execute(tokens.slice(1), this.pluginContext());
   }
 
   private init(args: readonly string[]): CommandResult {
@@ -169,6 +175,9 @@ export class CommandRegistry {
       "front <id> | back <id>                reorder siblings",
       "tree [id] | show <id> | help", "undo | redo | exit | quit",
       'Use double quotes for spaces; lines starting with # are comments.',
+      ...this.extensions.commandsList()
+        .filter((command) => !this.handlers.has(command.name))
+        .map((command) => `${command.usage.padEnd(38)} ${command.help}`),
     ].join("\n") };
   }
 
@@ -307,5 +316,12 @@ export class CommandRegistry {
     }
 
     return id;
+  }
+
+  private pluginContext(): PluginCommandContext {
+    return {
+      getDocument: () => this.session.getDocument(),
+      ...(this.directoryReader === undefined ? {} : { directoryReader: this.directoryReader }),
+    };
   }
 }
