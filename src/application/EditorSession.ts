@@ -12,6 +12,8 @@ import { GroupCommand } from "./commands/GroupCommand.js";
 import { UngroupCommand } from "./commands/UngroupCommand.js";
 import type { DocumentStore } from "./DocumentStore.js";
 import { ExtensionRegistry } from "./extensions/ExtensionRegistry.js";
+import type { AttributeHandler } from "./extensions/PluginContracts.js";
+import type { GeometryChange, Shape } from "../domain/shape/Shape.js";
 
 /** 当前文档与只管理该文档的命令总线。 */
 interface ActiveDocument {
@@ -110,7 +112,8 @@ export class EditorSession {
   }
 
   public setAttribute(id: string, attribute: string, value: string): void {
-    this.execute(new SetAttributeCommand(id, attribute, value));
+    this.execute(new SetAttributeCommand(id, attribute, value,
+      (shape, name, next) => this.prepareAttributeChange(shape, name, next)));
   }
 
   public groupShapes(id: string, ids: readonly string[]): void {
@@ -165,5 +168,17 @@ export class EditorSession {
   /** 各装饰器保存自己的快照，供之后的树渲染比较当前内容。 */
   private markDecoratorsSaved(document: SvgDocument): void {
     for (const decorator of this.extensions.treeDecorators()) decorator.onSaved?.(document);
+  }
+
+  /** 唯一处理器负责该属性；零个命中时沿用图形自身的 Phase 1 白名单。 */
+  private prepareAttributeChange(shape: Shape, attribute: string, value: string): GeometryChange {
+    const handlers = this.extensions.attributeHandlers().filter((handler) => handler.handles(shape, attribute));
+    if (handlers.length > 1) {
+      throw new RangeError(`multiple attribute handlers match: ${shape.type}#${shape.id} ${attribute}`);
+    }
+    const handler: AttributeHandler | undefined = handlers[0];
+    return handler === undefined
+      ? shape.prepareSet(attribute, value)
+      : handler.prepare(shape, attribute, value);
   }
 }
