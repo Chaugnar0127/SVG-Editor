@@ -1,12 +1,21 @@
 {
-  "extends": "../tsconfig.json",
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "rootDir": "./src",
     "outDir": "./out",
     "types": [
       "node",
       "vscode"
-    ]
+    ],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "sourceMap": true
   },
   "include": [
     "src/**/*.ts"

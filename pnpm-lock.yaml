@@ -15,12 +15,25 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
-      '@types/vscode':
-        specifier: ^1.146.0
-        version: 1.146.0
       tsx:
         specifier: ^4.19.0
         version: 4.23.15
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  vscode-extension:
+    dependencies:
+      '@xmldom/xmldom':
+        specifier: ^0.9.12
+        version: 0.9.12
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      '@types/vscode':
+        specifier: ^1.146.0
+        version: 1.146.0
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

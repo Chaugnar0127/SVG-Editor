@@ -9,16 +9,15 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:vscode": "tsc -p vscode-extension/tsconfig.json",
+    "build:vscode": "pnpm --filter svg-editor-vscode build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:vscode": "tsc -p vscode-extension/tsconfig.json --noEmit",
+    "typecheck:vscode": "pnpm --filter svg-editor-vscode check",
     "typecheck:test": "tsc -p test/tsconfig.json --noEmit",
     "cli": "tsx src/main.ts",
     "start": "node dist/main.js",
     "test": "tsx --test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.146.0",
     "@types/node": "^24.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.0"

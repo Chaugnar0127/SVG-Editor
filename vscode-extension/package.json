@@ -1,7 +1,7 @@
 {
   "name": "svg-editor-vscode",
   "displayName": "SVG Editor SVG Support",
-  "description": "File decorations for SVG files.",
+  "description": "File decorations and a document outline for SVG files.",
   "version": "0.1.0",
   "publisher": "svg-editor",
   "engines": {
@@ -10,8 +10,20 @@
   "categories": [
     "Other"
   ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
   "main": "./out/extension.js",
   "activationEvents": [
     "onStartupFinished"
-  ]
+  ],
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.146.0",
+    "typescript": "^5.9.0"
+  }
 }
