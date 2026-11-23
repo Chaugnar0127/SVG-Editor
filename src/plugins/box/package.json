@@ -1,0 +1,10 @@
+{
+  "name": "box",
+  "type": "module",
+  "main": "./BoxPlugin.ts",
+  "contributes": {
+    "shapes": ["box"],
+    "attributes": ["box-attributes"],
+    "decorators": ["box-type-label"]
+  }
+}

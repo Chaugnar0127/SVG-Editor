@@ -1,0 +1,8 @@
+{
+  "name": "modified-star",
+  "type": "module",
+  "main": "./ModifiedStarPlugin.ts",
+  "contributes": {
+    "decorators": ["modified-star"]
+  }
+}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -56,6 +56,11 @@ test("code and config assembly share registration and options behavior", withDir
       }
     };
   `);
+  writeFileSync(join(directory, "package.json"), JSON.stringify({
+    name: "shared-package",
+    main: "./shared.mjs",
+    contributes: { commands: ["shared"] },
+  }));
   const configPath = writeConfig(directory, [
     { module: "./shared.mjs", options },
     { module: "./disabled.mjs", enabled: false },
@@ -69,6 +74,31 @@ test("code and config assembly share registration and options behavior", withDir
   assert.deepEqual(configuredRegistry.command("shared")?.execute([], context), {
     kind: "message", text: JSON.stringify(options),
   });
+}));
+
+test("config mode validates registrations against package.json contributes", withDirectory(async (directory) => {
+  const packageDirectory = join(directory, "packaged");
+  mkdirSync(packageDirectory);
+  writeFileSync(join(packageDirectory, "package.json"), JSON.stringify({
+    name: "package-manifest",
+    type: "module",
+    main: "./plugin.mjs",
+    contributes: { commands: ["from-package"] },
+  }));
+  writeModule(packageDirectory, "plugin.mjs", `export default {
+    manifest: { name: "code-manifest", contributes: { commands: ["wrong"] } },
+    activate(context) {
+      context.registerCommand({ name: "from-package", usage: "from-package", help: "from-package",
+        execute: () => ({ kind: "message", text: "registered" }) });
+    }
+  };`);
+  const registry = new ExtensionRegistry();
+  const errors = await new PluginLoader(registry).loadConfig(writeConfig(directory, [
+    { module: "./packaged/plugin.mjs" },
+  ]));
+  assert.deepEqual(errors, []);
+  assert.equal(registry.command("from-package")?.name, "from-package");
+  assert.equal(registry.command("wrong"), undefined);
 }));
 
 test("config validation is all-or-nothing and reports invalid configuration", withDirectory(async (directory) => {

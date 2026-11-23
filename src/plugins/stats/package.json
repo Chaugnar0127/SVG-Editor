@@ -1,0 +1,8 @@
+{
+  "name": "stats",
+  "type": "module",
+  "main": "./StatsPlugin.ts",
+  "contributes": {
+    "commands": ["stats"]
+  }
+}

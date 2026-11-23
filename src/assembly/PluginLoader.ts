@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ExtensionRegistry } from "../application/extensions/ExtensionRegistry.js";
-import type { Plugin, PluginInstallFailure } from "../application/extensions/PluginContracts.js";
+import type { Plugin, PluginContributions, PluginContext, PluginInstallFailure } from "../application/extensions/PluginContracts.js";
 
 interface PluginConfigEntry {
   readonly module: string;
@@ -71,7 +71,18 @@ export class PluginLoader {
         errors.push(`error: plugin failed to load: ${entry.module} (invalid default export)`);
         continue;
       }
-      const failure = this.install(exported.plugin, entry.options);
+      const packageMetadata = packageManifest(resolvedModule);
+      if (packageMetadata.kind === "invalid") {
+        errors.push(`error: plugin failed to load: ${entry.module} (invalid package manifest)`);
+        continue;
+      }
+      const plugin: Plugin = packageMetadata.kind === "manifest"
+        ? {
+          manifest: packageMetadata.manifest,
+          activate: (context: PluginContext, options?: unknown) => exported.plugin.activate(context, options),
+        }
+        : exported.plugin;
+      const failure = this.install(plugin, entry.options);
       if (failure !== undefined) errors.push(failure);
     }
     return errors;
@@ -129,6 +140,35 @@ function inspectDefaultExport(value: unknown): DefaultExport {
   const contributes = candidate.manifest.contributes;
   if (contributes !== undefined && !validContributions(contributes)) return { kind: "invalid" };
   return { kind: "plugin", plugin: candidate as Plugin };
+}
+
+type PackageManifestResult =
+  | { readonly kind: "none" }
+  | { readonly kind: "invalid" }
+  | { readonly kind: "manifest"; readonly manifest: Plugin["manifest"] };
+
+function packageManifest(modulePath: string): PackageManifestResult {
+  let directory = dirname(modulePath);
+  while (true) {
+    try {
+      const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as unknown;
+      if (typeof value !== "object" || value === null) return { kind: "invalid" };
+      const candidate = value as { name?: unknown; main?: unknown; exports?: unknown; contributes?: unknown };
+      if (typeof candidate.main !== "string" && candidate.exports === undefined) return { kind: "none" };
+      if (typeof candidate.name !== "string" || candidate.name.trim().length === 0) return { kind: "invalid" };
+      const contributes = candidate.contributes ?? {};
+      if (!validContributions(contributes)) return { kind: "invalid" };
+      return {
+        kind: "manifest",
+        manifest: { name: candidate.name, contributes: contributes as PluginContributions },
+      };
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") return { kind: "invalid" };
+    }
+    const parent = resolve(directory, "..");
+    if (parent === directory) return { kind: "none" };
+    directory = parent;
+  }
 }
 
 function validContributions(value: unknown): boolean {
