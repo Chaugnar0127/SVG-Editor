@@ -10,6 +10,7 @@ test("module imports follow the documented dependency direction", () => {
     domain: ["domain"], application: ["application", "domain"],
     presentation: ["presentation", "domain"], cli: ["cli", "application", "presentation"],
     plugins: ["plugins", "application", "domain"],
+    assembly: ["assembly", "application", "domain"],
     infrastructure: ["infrastructure", "application", "domain"],
   };
   const check = (directory: string): void => {
@@ -26,7 +27,7 @@ test("module imports follow the documented dependency direction", () => {
           const target = relative(root, resolve(dirname(file), dependency)).split(/[\\/]/u)[0]!;
           assert.ok(allowed[layer]?.includes(target), `${file} must not depend on ${dependency}`);
         } else {
-          assert.ok(layer === "infrastructure" || layer === "cli", `${file} must not import external runtime ${dependency}`);
+          assert.ok(layer === "infrastructure" || layer === "cli" || layer === "assembly", `${file} must not import external runtime ${dependency}`);
         }
       }
     }

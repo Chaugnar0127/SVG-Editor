@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { PluginLoader } from "./assembly/PluginLoader.js";
 import { EditorSession } from "./application/EditorSession.js";
 import { ExtensionRegistry } from "./application/extensions/ExtensionRegistry.js";
 import { ShapeFactory } from "./application/ShapeFactory.js";
@@ -8,16 +11,28 @@ import { SvgFileStore } from "./infrastructure/SvgFileStore.js";
 import { SvgCodec } from "./infrastructure/SvgCodec.js";
 import { NodeDirectoryReader } from "./infrastructure/NodeDirectoryReader.js";
 import builtinShapesPlugin from "./plugins/shapes/BuiltinShapesPlugin.js";
-import statsPlugin from "./plugins/stats/StatsPlugin.js";
-import dirPlugin from "./plugins/dir/DirPlugin.js";
-import modifiedStarPlugin from "./plugins/tree/ModifiedStarPlugin.js";
-import boxPlugin from "./plugins/box/BoxPlugin.js";
 
 const extensions = new ExtensionRegistry();
-for (const plugin of [builtinShapesPlugin, statsPlugin, dirPlugin, modifiedStarPlugin, boxPlugin]) {
-  const result = extensions.install(plugin);
-  if (!result.success) throw new Error(`default plugin failed to install: ${plugin.manifest.name}`);
+const loader = new PluginLoader(extensions);
+const baseFailure = loader.install(builtinShapesPlugin);
+if (baseFailure !== undefined) throw new Error(baseFailure);
+
+const configPath = resolve(process.cwd(), "plugins.config.json");
+let pluginErrors: readonly string[];
+if (existsSync(configPath)) {
+  pluginErrors = await loader.loadConfig(configPath);
+} else {
+  const defaults = [
+    (await import("./plugins/stats/StatsPlugin.js")).default,
+    (await import("./plugins/dir/DirPlugin.js")).default,
+    (await import("./plugins/tree/ModifiedStarPlugin.js")).default,
+    (await import("./plugins/box/BoxPlugin.js")).default,
+  ];
+  pluginErrors = defaults
+    .map((plugin) => loader.install(plugin))
+    .filter((failure): failure is string => failure !== undefined);
 }
+for (const error of pluginErrors) console.log(error);
 
 const shapeFactory = new ShapeFactory(extensions);
 const codec = new SvgCodec(shapeFactory);

@@ -53,7 +53,7 @@ export interface PluginContributions {
 
 export interface PluginManifest {
   readonly name: string;
-  readonly contributes: PluginContributions;
+  readonly contributes?: PluginContributions;
 }
 
 export interface PluginContext {

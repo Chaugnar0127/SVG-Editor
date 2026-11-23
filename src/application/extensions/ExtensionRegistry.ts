@@ -98,7 +98,7 @@ export class ExtensionRegistry {
   public attributeHandlers(): readonly AttributeHandler[] { return [...this.attributes.values()]; }
 
   private findManifestMismatch(plugin: Plugin, staged: StagingContext): PluginInstallFailure | undefined {
-    const declared = plugin.manifest.contributes;
+    const declared = plugin.manifest.contributes ?? {};
     for (const category of categories) {
       const expected = [...(declared[category] ?? [])].sort();
       const actual = [...staged[category].keys()].sort();
