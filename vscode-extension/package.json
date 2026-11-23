@@ -1,0 +1,17 @@
+{
+  "name": "svg-editor-vscode",
+  "displayName": "SVG Editor SVG Support",
+  "description": "File decorations for SVG files.",
+  "version": "0.1.0",
+  "publisher": "svg-editor",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ]
+}
