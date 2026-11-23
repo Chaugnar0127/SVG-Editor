@@ -135,7 +135,10 @@ export class CommandRegistry {
 
     this.session.createShape(type, id, parameters, containerId);
 
-    const suffix = containerId === undefined ? "" : ` in g#${containerId}`;
+    const containerType = containerId === undefined
+      ? undefined
+      : this.session.requireDocument().require(containerId).type;
+    const suffix = containerId === undefined ? "" : ` in ${containerType}#${containerId}`;
 
     return {
       kind: "message",
@@ -223,10 +226,11 @@ export class CommandRegistry {
     }
 
     this.session.addTo(containerId, id);
+    const containerType = this.session.requireDocument().require(containerId).type;
 
     return {
       kind: "message",
-      text: `shape ${id} moved into g#${containerId}`,
+      text: `shape ${id} moved into ${containerType}#${containerId}`,
     };
   }
 

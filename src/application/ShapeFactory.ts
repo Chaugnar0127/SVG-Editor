@@ -5,7 +5,10 @@ import { EllipseShape } from "../domain/shape/EllipseShape.js";
 import { LineShape } from "../domain/shape/LineShape.js";
 import { TextShape } from "../domain/shape/TextShape.js";
 import type { Shape } from "../domain/shape/Shape.js";
+import { isContainerShape } from "../domain/shape/Shape.js";
 import { expectCount, numberAt } from "./arguments.js";
+import { ExtensionRegistry } from "./extensions/ExtensionRegistry.js";
+import type { ShapeProvider, SvgElementData } from "./extensions/PluginContracts.js";
 
 type ShapeCreator = (id: string, parameters: readonly string[]) => Shape;
 interface ShapeDefinition {
@@ -15,6 +18,8 @@ interface ShapeDefinition {
 }
 
 export class ShapeFactory {
+  public constructor(private readonly extensions: ExtensionRegistry = new ExtensionRegistry()) {}
+
   private readonly definitions: ReadonlyMap<string, ShapeDefinition> = new Map<string, ShapeDefinition>([
     ["rect", { create: (id, parameters) => this.createRect(id, parameters), geometry: ["x", "y", "width", "height"] }],
     ["g", { create: (id, parameters) => this.createGroup(id, parameters), geometry: [] }],
@@ -30,7 +35,8 @@ export class ShapeFactory {
     id: string,
     parameters: readonly string[],
   ): Shape {
-    const definition = this.definition(type);
+    const provider = this.extensions.shapeProvider(type);
+    const definition = provider === undefined ? this.definition(type) : undefined;
 
     if (id.length === 0 || /\s/u.test(id)) {
       throw new RangeError(
@@ -38,7 +44,31 @@ export class ShapeFactory {
       );
     }
 
-    return definition.create(id, parameters);
+    return provider?.create(id, parameters) ?? definition!.create(id, parameters);
+  }
+
+  /** 先交由插件解释元素；未匹配时沿用内置类型，并把未启用的 box 降级为 g。 */
+  public fromElement(element: SvgElementData, id: string, children: readonly Shape[]): Shape {
+    const providers = this.extensions.shapeProviders().filter((provider) => provider.canRead(element));
+    if (providers.length > 1) throw new RangeError(`ambiguous shape provider for <${element.name}>`);
+    const provider: ShapeProvider | undefined = providers[0];
+    if (provider !== undefined) return provider.read(element, id, children);
+
+    const attributes = { ...element.attributes };
+    if (element.name === "g" && attributes["data-kind"] === "box") delete attributes["data-kind"];
+    const shape = this.fromAttributes(element.name, id, attributes, element.text);
+    if (children.length > 0 && !isContainerShape(shape)) {
+      throw new RangeError(`children are not supported in <${element.name}>`);
+    }
+    if (isContainerShape(shape)) for (const child of children) shape.add(child);
+    return shape;
+  }
+
+  /** 只有自定义图形需要提供器定义 XML 表示；内置图形保留原序列化行为。 */
+  public toElement(shape: Shape): SvgElementData | undefined {
+    const providers = this.extensions.shapeProviders().filter((provider) => provider.canWrite(shape));
+    if (providers.length > 1) throw new RangeError(`ambiguous shape writer for ${shape.type}#${shape.id}`);
+    return providers[0]?.write(shape);
   }
 
   /** 导入器传普通属性，不把 XML 库类型带进应用层；类型分派仍只有此工厂。 */

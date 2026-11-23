@@ -1,8 +1,9 @@
-import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
+import type { ContainerShape, GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
 import { StyledShape } from "./StyledShape.js";
 
-export class GroupShape extends StyledShape implements Shape {
-  public override readonly type = "g";
+export class GroupShape extends StyledShape implements ContainerShape {
+  public override readonly type: string = "g";
+  public readonly ungroupable: boolean = true;
   private readonly childShapes: Shape[] = [];
 
   /** 创建具有指定 ID 的空组。 */
@@ -63,6 +64,11 @@ export class GroupShape extends StyledShape implements Shape {
 
     this.childShapes.splice(index, 1);
     return child;
+  }
+
+  /** 普通分组的直接成员可由文档命令单独编辑或移出。 */
+  public canModifyChild(id: string): boolean {
+    return this.childShapes.some((child) => child.id === id);
   }
 
   /** 汇集直接子节点的变更，嵌套组通过相同接口递归准备。 */

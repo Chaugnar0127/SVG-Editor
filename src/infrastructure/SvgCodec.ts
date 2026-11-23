@@ -2,7 +2,6 @@ import { DOMImplementation, DOMParser, XMLSerializer, type Document, type Elemen
 import type { LoadedDocument } from "../application/DocumentStore.js";
 import { ShapeFactory } from "../application/ShapeFactory.js";
 import { SvgDocument } from "../domain/document/SvgDocument.js";
-import { GroupShape } from "../domain/shape/GroupShape.js";
 import type { Shape } from "../domain/shape/Shape.js";
 
 const svgNamespace = "http://www.w3.org/2000/svg";
@@ -53,13 +52,12 @@ export class SvgCodec {
         ids.add(id);
         warnings.push(`warning: assigned id ${id} to unnamed <${type}>`);
       }
-      const shape = this.factory.fromAttributes(type, id, attributes, this.directText(element));
-      const children = this.elements(element);
-      if (children.length > 0 && !(shape instanceof GroupShape)) {
-        throw new RangeError(`children are not supported in <${element.localName}>`);
-      }
-      if (shape instanceof GroupShape) for (const child of children) shape.add(readShape(child));
-      return shape;
+      const children = this.elements(element).map(readShape);
+      return this.factory.fromElement({
+        name: type,
+        attributes,
+        text: this.directText(element),
+      }, id, children);
     };
     if (this.directText(root).trim().length !== 0) throw new SyntaxError("unexpected text in <svg>");
     for (const child of this.elements(root)) document.add(readShape(child));
@@ -74,12 +72,18 @@ export class SvgCodec {
     root.setAttribute("viewBox", document.viewBox.join(" "));
     const append = (parent: Element, shape: Shape, depth: number): void => {
       this.assertXmlText(shape.id);
-      const element = xml.createElementNS(svgNamespace, shape.type);
+      const representation = this.factory.toElement(shape);
+      const element = xml.createElementNS(svgNamespace, representation?.name ?? shape.type);
       element.setAttribute("id", shape.id);
-      for (const [name, value] of Object.entries(shape.attributes())) {
+      const attributes = representation?.attributes ?? shape.attributes();
+      for (const [name, value] of Object.entries(attributes)) {
         this.assertXmlText(String(value));
         if (name === "text") element.appendChild(xml.createTextNode(String(value)));
         else element.setAttribute(name, String(value));
+      }
+      if (representation?.text !== undefined && representation.text.length > 0) {
+        this.assertXmlText(representation.text);
+        element.appendChild(xml.createTextNode(representation.text));
       }
       parent.appendChild(xml.createTextNode(`\n${"  ".repeat(depth)}`));
       parent.appendChild(element);

@@ -1,10 +1,10 @@
-import type { GeometryChange, Shape } from "../shape/Shape.js";
+import { isContainerShape, type ContainerShape, type GeometryChange, type Shape } from "../shape/Shape.js";
 import { GroupShape } from "../shape/GroupShape.js";
 
 /** 原图形及其所在位置的记录，供删除、迁移和排序撤销使用。 */
 export interface ShapeLocation {
   readonly shape: Shape;
-  readonly parent: GroupShape | null;
+  readonly parent: ContainerShape | null;
   readonly index: number;
 }
 
@@ -93,20 +93,30 @@ export class SvgDocument {
     return shape;
   }
 
+  /** 返回可由普通图形命令直接修改的节点；插件必需子部件会被保护。 */
+  public requireModifiable(id: string): Shape {
+    const shape = this.require(id);
+    const parent = this.locate(shape).parent;
+    if (parent !== null && !parent.canModifyChild(id)) {
+      throw new RangeError(`cannot modify required child: ${id}`);
+    }
+    return shape;
+  }
+
   /** 查询原图形的直接父容器；顶层图形返回 null。 */
-  public parentOf(shape: Shape): GroupShape | null {
+  public parentOf(shape: Shape): ContainerShape | null {
     return this.locate(shape).parent;
   }
 
   /** 获取必须存在的组，区分目标不存在和目标不是容器两种错误。 */
-  public requireContainer(id: string): GroupShape {
+  public requireContainer(id: string): ContainerShape {
     const shape = this.find(id);
 
     if (shape === undefined) {
       throw new RangeError(`no such container: ${id}`);
     }
 
-    if (!(shape instanceof GroupShape)) {
+    if (!isContainerShape(shape)) {
       throw new RangeError(`not a container: ${id}`);
     }
 
@@ -119,7 +129,7 @@ export class SvgDocument {
    */
   public add(
     shape: Shape,
-    parent: GroupShape | null = null,
+    parent: ContainerShape | null = null,
     index?: number,
   ): void {
     if (parent !== null) {
@@ -158,6 +168,9 @@ export class SvgDocument {
     if (location.parent === null) {
       this.rootShapes.splice(location.index, 1);
     } else {
+      if (!location.parent.canModifyChild(location.shape.id)) {
+        throw new RangeError(`cannot modify required child: ${location.shape.id}`);
+      }
       location.parent.remove(location.shape.id);
     }
 
@@ -179,7 +192,7 @@ export class SvgDocument {
    */
   public moveTo(
     shape: Shape,
-    parent: GroupShape | null,
+    parent: ContainerShape | null,
     index?: number,
   ): ShapeLocation {
     if (this.find(shape.id) !== shape) {
@@ -249,20 +262,20 @@ export class SvgDocument {
     if (new Set(ids).size !== ids.length) throw new RangeError("group targets must be distinct");
     const selected = new Set(ids.map((id) => this.require(id)));
     const locations: ShapeLocation[] = [];
-    const visit = (shapes: readonly Shape[], parent: GroupShape | null, ancestor?: Shape): void => {
+    const visit = (shapes: readonly Shape[], parent: ContainerShape | null, ancestor?: Shape): void => {
       for (const [index, shape] of shapes.entries()) {
         const included = selected.has(shape);
         if (included && ancestor !== undefined) {
           throw new RangeError(`cannot group a container into its own descendant: ${ancestor.id}`);
         }
         if (included) locations.push({ shape, parent, index });
-        if (shape instanceof GroupShape) visit(shape.children(), shape, included ? shape : ancestor);
+        if (isContainerShape(shape)) visit(shape.children(), shape, included ? shape : ancestor);
       }
     };
     visit(this.rootShapes, null);
 
-    const ancestry = (parent: GroupShape | null): (GroupShape | null)[] => {
-      const chain: (GroupShape | null)[] = [];
+    const ancestry = (parent: ContainerShape | null): (ContainerShape | null)[] => {
+      const chain: (ContainerShape | null)[] = [];
       while (parent !== null) {
         chain.push(parent);
         parent = this.parentOf(parent);
@@ -298,6 +311,7 @@ export class SvgDocument {
   /** 解散嵌套组，子节点占据原组的位置；显式样式下放以保留继承外观。 */
   public prepareUngroup(id: string): GeometryChange {
     const group = this.requireContainer(id);
+    if (!group.ungroupable) throw new RangeError(`cannot ungroup protected container: ${id}`);
     const location = this.locate(group);
     if (location.parent === null) throw new RangeError(`cannot ungroup top-level container: ${id}`);
     const children = group.children();
@@ -331,14 +345,14 @@ export class SvgDocument {
   private locate(shape: Shape): ShapeLocation {
     const search = (
       siblings: readonly Shape[],
-      parent: GroupShape | null,
+      parent: ContainerShape | null,
     ): ShapeLocation | undefined => {
       for (const [index, candidate] of siblings.entries()) {
         if (candidate === shape) {
           return { shape: candidate, parent, index };
         }
 
-        if (candidate instanceof GroupShape) {
+        if (isContainerShape(candidate)) {
           const found = search(candidate.children(), candidate);
 
           if (found !== undefined) {

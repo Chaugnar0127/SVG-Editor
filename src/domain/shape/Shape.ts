@@ -30,3 +30,20 @@ export interface Shape {
   /** 按顺序读取直接子节点；叶子返回空数组。 */
   children(): readonly Shape[];
 }
+
+/** 可承载子图形的领域能力；文档结构操作只依赖此契约。 */
+export interface ContainerShape extends Shape {
+  readonly ungroupable: boolean;
+  add(child: Shape, index?: number): void;
+  remove(id: string): Shape;
+  canModifyChild(id: string): boolean;
+}
+
+/** 结构判断基于公开能力，不依赖某一种容器的具体类。 */
+export function isContainerShape(shape: Shape): shape is ContainerShape {
+  const candidate = shape as Shape & Partial<ContainerShape>;
+  return typeof candidate.add === "function"
+    && typeof candidate.remove === "function"
+    && typeof candidate.canModifyChild === "function"
+    && typeof candidate.ungroupable === "boolean";
+}

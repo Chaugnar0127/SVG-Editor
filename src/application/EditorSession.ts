@@ -23,12 +23,12 @@ interface ActiveDocument {
 }
 
 export class EditorSession {
-  private readonly shapeFactory = new ShapeFactory();
   private current: ActiveDocument | undefined;
 
   public constructor(
     private readonly store?: DocumentStore,
     private readonly extensions: ExtensionRegistry = new ExtensionRegistry(),
+    private readonly shapeFactory: ShapeFactory = new ShapeFactory(extensions),
   ) {}
 
   /** 新文档创建成功后，再整体替换当前文档及其历史。 */

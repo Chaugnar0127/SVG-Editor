@@ -22,7 +22,7 @@ export class MoveCommand implements EditCommand {
       throw new Error("move command is already executed");
     }
 
-    const shape = document.require(this.id);
+    const shape = document.requireModifiable(this.id);
     const change = shape.prepareMove(this.dx, this.dy);
 
     change.apply();

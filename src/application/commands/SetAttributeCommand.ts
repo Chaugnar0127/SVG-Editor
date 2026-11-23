@@ -21,7 +21,7 @@ export class SetAttributeCommand implements EditCommand {
 
   public execute(document: SvgDocument): void {
     if (this.previous !== undefined) throw new Error("set command is already executed");
-    const shape = document.require(this.id);
+    const shape = document.requireModifiable(this.id);
     const change = this.createChange(shape, this.attribute, this.value);
     try {
       change.apply();

@@ -9,7 +9,7 @@ export class ScaleCommand implements EditCommand {
 
   public execute(document: SvgDocument): void {
     if (this.previous !== undefined) throw new Error("scale command is already executed");
-    const shape = document.require(this.id);
+    const shape = document.requireModifiable(this.id);
     const change = shape.prepareScale(this.factor);
     change.apply();
     this.previous = { shape, change };
