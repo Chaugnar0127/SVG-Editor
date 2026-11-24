@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:vscode": "pnpm --filter svg-editor-vscode check",
     "typecheck:test": "tsc -p test/tsconfig.json --noEmit",
+    "metrics": "node scripts/phase2-metrics.mjs",
     "cli": "tsx src/main.ts",
     "start": "node dist/main.js",
     "test": "tsx --test"

@@ -1,8 +1,146 @@
 # SVG 编辑器 CLI 架构方案
 
-本文记录 Phase 1 的最终实现，使用方式见 [项目说明](../README.md)。
+本文以 Phase 2 当前实现为准；Phase 1 的原始设计记录保留在后文历史章节。使用方式见 [项目说明](../README.md)。
 
-## 架构方案
+## Phase 2 当前架构
+
+Phase 2 在 CLI 的应用侧加入四个插件扩展点，并新增独立的 VS Code 扩展。内核依赖扩展契约和注册表，不导入具体插件；插件由组合根装配，文件系统和 VS Code API 分别留在外层适配代码。
+
+### 模块和依赖
+
+```text
+src/
+  main.ts                              # 组合根：默认代码装配或 --config
+  assembly/PluginLoader.ts             # 配置校验、ESM 加载和插件安装
+  assembly/CliHost.ts                  # 装配应用会话、CLI 与基础设施适配器
+  application/extensions/
+    PluginContracts.ts                 # 四类扩展接口及插件清单
+    ExtensionRegistry.ts                # 暂存注册、校验清单、原子提交
+  application/DirectoryReader.ts        # dir 使用的目录访问端口
+  infrastructure/NodeDirectoryReader.ts # Node 文件系统适配器
+  plugins/
+    shapes/BuiltinShapesPlugin.ts       # 六种内置图形
+    stats/StatsPlugin.ts                # stats 命令
+    dir/DirPlugin.ts                    # dir 命令
+    box/BoxPlugin.ts                    # box、属性处理器和类型标签
+    tree/ModifiedStarPlugin.ts          # dirty 状态标签
+vscode-extension/src/
+  extension.ts                          # 向 VS Code 注册 provider
+  FileDecorationProvider.ts             # Explorer SVG 标记
+  SvgOutlineProvider.ts                 # 原生大纲适配
+  svgOutline.ts                         # XML 节点和源码范围
+```
+
+Phase 1 的主要依赖关系：
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+[main] --> [cli]
+[main] --> [application]
+[main] --> [infrastructure]
+[cli] --> [application]
+[cli] --> [presentation]
+[presentation] --> [domain]
+[application] --> [domain]
+[application] --> [DocumentStore]
+[infrastructure] ..|> [DocumentStore]
+[infrastructure] --> [application]
+[infrastructure] --> [domain]
+@enduml
+```
+
+Phase 2 在应用内增加稳定扩展契约，并把动态模块发现留在装配边界：
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+[main] --> [PluginLoader]
+[main] --> [CliHost]
+[PluginLoader] --> [ExtensionRegistry]
+[PluginLoader] --> [plugins]
+[CliHost] --> [EditorSession]
+[CliHost] --> [CommandRegistry]
+[CliHost] --> [Repl]
+[CliHost] --> [NodeDirectoryReader]
+[CliHost] --> [SvgFileStore]
+[CliHost] --> [SvgCodec]
+[ExtensionRegistry] --> [PluginContracts]
+[ShapeFactory] --> [ExtensionRegistry]
+[CommandRegistry] --> [ExtensionRegistry]
+[EditorSession] --> [ExtensionRegistry]
+[Formatters] --> [TreeDecorator contract]
+[plugins] ..> [PluginContracts] : implements
+[plugins] ..> [domain/application abstractions]
+[application] --> [domain]
+[infrastructure] ..|> [DocumentStore]
+[main] --> [infrastructure]
+@enduml
+```
+
+`ExtensionRegistry.install()` 在私有暂存上下文运行插件的 `activate`，核对 `contributes` 与实际注册名集合，再检查跨插件重名；任一检查失败都丢弃这批暂存项，不影响已安装插件。代码装配调用 `PluginLoader.install(plugin, options)`，配置装配解析模块及 `package.json` 清单后也进入同一个 `install` 路径。配置数组顺序就是注册顺序，`enabled: false` 不导入模块，相对路径以配置文件为基准，包名按 CLI 的 ESM 运行环境解析。
+
+### 扩展点清单
+
+| 接口 | 职责与内核调用位置 | 实现 | 禁用时的行为 | 违反契约时 |
+|---|---|---|---|---|
+| `ShapeProvider` | 创建及读回/写出图形；`ShapeFactory.create/fromElement/toElement` | `BuiltinShapesPlugin`、`BoxPlugin` | 六种内置图形仍装配；未加载 box 时 `create box` 报未知类型，带标记的 `<g>` 按普通组读回 | 同名注册或清单不一致时拒绝插件；多个读写器命中时拒绝该操作 |
+| `PluginCommand`（扩展点名为 `Command`） | 命令分发与 help；`CommandRegistry.execute/help` | `StatsPlugin`、`DirPlugin` | 未注册命令报 `unknown command`，内置命令不变 | 同名命令拒绝安装；参数错误由命令报告 usage |
+| `TreeDecorator` | 为树行生成标签；`Formatters.tree` 调用 `prepare/decorate`，`EditorSession.markDecoratorsSaved` 更新保存基线 | `ModifiedStarPlugin`、`BoxPlugin` | 无插件时 Phase 1 树输出保持原样 | 重复名称拒绝安装；插件只可通过目标和文档接口观察状态 |
+| `AttributeHandler` | 为特定图形定义 `set` 语义；`EditorSession.prepareAttributeChange` 配合 `SetAttributeCommand` | `BoxPlugin` 的 `box-attributes` | 无命中时回退图形原有属性白名单 | 多个处理器同时命中时在修改前拒绝；处理器异常触发变更撤销，历史不前移 |
+
+注册表以扩展类别和名称为唯一键。激活失败、重复名或清单不匹配都输出对应 `error:` 并丢弃当前插件的暂存注册；配置中某个插件失败不会阻止后续条目加载。包缺失、无默认导出、导入/依赖求值失败也分别报告，不会终止 REPL。
+
+### 插件命令与目录适配器
+
+`PluginCommand` 提供 `name`、`usage`、`help` 和 `execute(args, context)`，因此命令名称和参数说明由插件拥有。`stats` 深度优先遍历画布节点，按类型首次出现顺序统计叶子；普通组和 box 只计容器。
+
+`dir` 依赖应用端口 `DirectoryReader`（`currentPath`、`list()`），不依赖 Node API。组合根把 `NodeDirectoryReader` 注入 `CommandRegistry`，它在构造时固定 `process.cwd()`，使用 `readdirSync` 返回直接子项；插件命令负责按目录、文件和特殊项排序并格式化。该关系对应 Adapter：端口是应用所需能力，Node 类把操作系统目录转换成端口数据，命令只处理稳定的数据接口。符号链接及其他特殊项显示为 `[OTHER]`，不遍历目标；读取异常转换成稳定的 `error: cannot read directory: <path>` 消息。`dir` 不需要 SVG 文档，不会触碰编辑历史。
+
+### 属性、box 与树标签决策
+
+#### ADR-1：属性变更按一次命令准备和提交
+
+`AttributeHandler.handles` 只负责无副作用的匹配，`prepare` 返回一个 `GeometryChange`。零个命中沿用图形白名单，一个命中由该处理器负责，多个命中明确拒绝，不依赖注册顺序。`SetAttributeCommand` 先准备变更，再调用一次 `apply`；失败时调用同一变更的 `undo`，命令总线只在成功后更新历史。box 的 `fill`、`label` 分别委派给内部矩形或文本图形，因此一次 `set` 仍是一个 undo/redo 单元。处理器若组合多个子图形变化，应先全部准备，再通过一个 `GeometryChange` 提交并整体撤销。
+
+#### ADR-2：已安装 box 的无效结构拒绝读入
+
+`box` 使用 `<g data-kind="box">`，子部件 ID 固定为 `<id>-rect` 和 `<id>-label`。加载 box 插件时，缺少或类型错误的必要部件会使整次读入失败，保留活动文档；重复 ID 仍按全局唯一性规则拒绝。未加载 box 插件时，未知 `data-kind` 不丢弃通用 `<g>` 的子节点，而降级为普通组。这样安装插件后可获得强领域不变量，卸载插件后仍能查看文件结构。
+
+#### ADR-3：dirty 按内容相对保存点比较
+
+`modified-star` 在成功 `init/read/save` 后记录画布和每个节点的本地状态。`tree` 查询时按后序遍历比较节点属性及有序子节点 ID/type；节点或后代变化会标记自身和祖先容器，撤销回保存点后标记消失。插入或删除会改变父节点的子节点签名；被移动节点本身内容未变时，由父容器和祖先体现结构变化。同一行标签按注册顺序拼接，默认装配顺序为 `modified-star` 后 `box-type-label`，所以 box 行显示 `* (box)`。每次查询只扫描树一次，不再为每个节点重复构造完整后代字符串。
+
+#### ADR-4：配置清单从插件包元数据校验
+
+配置加载器先按 ESM 条件解析模块并导入默认导出，再读取最近的插件 `package.json` 中 `contributes` 清单。包清单覆盖代码对象中的声明，避免只有源码自述；解析出的实际注册名必须与清单分类及集合完全相等。插件进入暂存区且校验通过后才发布注册。模块缺失、模块自身或依赖求值失败分开报错，避免把依赖异常误报为插件不存在。
+
+### VS Code 扩展与 Phase 1 复用
+
+`vscode-extension/src/extension.ts` 是扩展入口。VS Code 加载并调用 `activate(context)`；扩展把 `SvgFileDecorationProvider`、`DocumentSymbolProvider` 和文件创建/删除/重命名事件订阅加入 `context.subscriptions`，由 VS Code 在 Explorer 更新或 Outline 请求符号时调用。
+
+文件标记不是经典 Decorator 模式：实现没有包装一个文件对象或调用原对象后叠加行为，而是注册 VS Code 定义的 provider，按 URI 返回额外 `FileDecoration` 元数据。它更接近平台扩展点；`shouldDecorateSvg` 是将 URI/文件类型规则适配为布尔策略的纯函数。大纲 provider 则把 `svgOutline.ts` 的解析结果转换成 VS Code `DocumentSymbol` 和 `Range`，属于清晰的 API 适配。
+
+SVG 语法节点遍历和 `xmldom` 使用经验可复用；Phase 1 的 `SvgCodec` 不适合作为大纲解析器，因为它要求完整、受支持的 SVG 并映射为编辑领域树，而文本编辑时 XML 暂时不完整很常见，大纲还必须保留精确源码范围。扩展因此只复用 XML parser，不依赖 CLI 的 `Shape`/`SvgDocument`。文件标记只看文件 URI/类型，与 SVG 内容及 CLI 文档模型无关。
+
+```sh
+pnpm build:vscode
+code --extensionDevelopmentPath=./vscode-extension .
+```
+
+仓库中的真实运行效果截图： [Explorer 文件标记](../docs/images/vscode-svg-badge.jpg)；[源码定位与嵌套大纲](../docs/images/vscode-svg-outline.jpg)。测试另覆盖无 ID 元素、文档编辑刷新和不完整 XML 返回空大纲。
+
+### 验收与指标
+
+插件注册/失败回滚、`dir` 测试替身与真实文件系统、box 结构和属性撤销、dirty 保存点、VS Code Outline 解析及配置 CLI 启动均有独立测试。端到端 CLI transcript 对照代码装配和配置装配，分别覆盖 Phase 1 基线、Phase 1 §6.1 的 box 版本 B、以及 `stats`/`dir`；每组使用相同的固定工作目录内容并逐字节比较输出。
+
+源码文件职责、按内核/装配/插件拆分的行数，以及复杂度变化通过 `pnpm metrics` 从 `final` 和 `p2` Git 引用生成，结果写入 [`docs/metrics/phase2.md`](../docs/metrics/phase2.md)。指标定义和纳入范围由 [生成脚本](../scripts/phase2-metrics.mjs) 固定，VS Code 扩展和依赖/构建产物不计入 CLI 重构指标。
+
+## Phase 1 历史设计
+
+以下章节保留 Phase 1 的最终实现记录，用作重构前对照；其中“box 属于后续阶段”等陈述只描述 Phase 1 时间点，不代表当前实现。
+
+### 架构方案
 
 ### 模块划分
 
