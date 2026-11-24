@@ -76,6 +76,38 @@ test("code and config assembly share registration and options behavior", withDir
   });
 }));
 
+test("config resolves packages through ESM import exports", withDirectory(async (directory) => {
+  const packageName = `svg-editor-import-only-${process.pid}-${Date.now()}`;
+  const packageDirectory = join(process.cwd(), "node_modules", packageName);
+  mkdirSync(packageDirectory);
+  writeFileSync(join(packageDirectory, "package.json"), JSON.stringify({
+    name: packageName,
+    type: "module",
+    exports: { ".": { import: "./plugin.mjs" } },
+    contributes: { commands: ["esm-only"] },
+  }));
+  writeModule(packageDirectory, "plugin.mjs", `export default {
+    manifest: { name: "esm-only", contributes: { commands: ["esm-only"] } },
+    activate(context) {
+      context.registerCommand({ name: "esm-only", usage: "esm-only", help: "ESM only",
+        execute: () => ({ kind: "message", text: "loaded through import" }) });
+    }
+  };`);
+  try {
+    const registry = new ExtensionRegistry();
+    const errors = await new PluginLoader(registry).loadConfig(writeConfig(directory, [
+      { module: packageName },
+    ]));
+
+    assert.deepEqual(errors, []);
+    assert.deepEqual(registry.command("esm-only")?.execute([], { getDocument: () => undefined }), {
+      kind: "message", text: "loaded through import",
+    });
+  } finally {
+    rmSync(packageDirectory, { recursive: true, force: true });
+  }
+}));
+
 test("config mode validates registrations against package.json contributes", withDirectory(async (directory) => {
   const packageDirectory = join(directory, "packaged");
   mkdirSync(packageDirectory);

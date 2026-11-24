@@ -11,11 +11,12 @@ export class Formatters {
   /** 展示全文档或指定子树，保持模型中的节点顺序。 */
   public tree(document: SvgDocument, id?: string, decorators: readonly TreeDecorator[] = []): string {
     const root = id === undefined ? undefined : document.require(id);
+    for (const decorator of decorators) decorator.prepare?.(document);
 
     const lines = [
       root === undefined
         ? `svg (${document.width}x${document.height})${this.decoration(decorators, {
-          key: "document:root", signature: this.documentSignature(document), shape: undefined, documentRoot: true,
+          key: "document:root", shape: undefined, documentRoot: true,
         })}`
         : `${this.describe(root)}${this.decoration(decorators, this.shapeTarget(root))}`,
     ];
@@ -65,21 +66,9 @@ export class Formatters {
   private shapeTarget(shape: Shape): TreeDecorationTarget {
     return {
       key: `shape:${shape.id}`,
-      signature: this.shapeSignature(shape),
       shape,
       documentRoot: false,
     };
-  }
-
-  private shapeSignature(shape: Shape): string {
-    return JSON.stringify([shape.id, shape.type, shape.attributes(), shape.children().map((child) => this.shapeSignature(child))]);
-  }
-
-  private documentSignature(document: SvgDocument): string {
-    return JSON.stringify([
-      document.width, document.height, document.viewBox,
-      document.topLevel().map((shape) => this.shapeSignature(shape)),
-    ]);
   }
 
   private describe(shape: Shape): string {

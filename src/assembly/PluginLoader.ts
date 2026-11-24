@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { ExtensionRegistry } from "../application/extensions/ExtensionRegistry.js";
 import type { Plugin, PluginContributions, PluginContext, PluginInstallFailure } from "../application/extensions/PluginContracts.js";
 
@@ -42,13 +41,12 @@ export class PluginLoader {
     }
 
     const errors: string[] = [];
-    const requireFromConfig = createRequire(isAbsolute(configPath) ? configPath : resolve(configPath));
     for (const entry of config.plugins) {
       if (entry.enabled === false) continue;
 
       let resolvedModule: string;
       try {
-        resolvedModule = requireFromConfig.resolve(entry.module);
+        resolvedModule = resolvePluginModule(entry.module, configPath);
       } catch {
         errors.push(`error: plugin not found: ${entry.module}`);
         continue;
@@ -98,6 +96,20 @@ export class PluginLoader {
         return `error: duplicate registration: ${failure.category}/${failure.name}`;
     }
   }
+}
+
+function resolvePluginModule(specifier: string, configPath: string): string {
+  let resolved: string;
+  if (isAbsolute(specifier)) {
+    resolved = resolve(specifier);
+  } else if (specifier.startsWith(".") || specifier.startsWith("/")) {
+    const configUrl = pathToFileURL(isAbsolute(configPath) ? configPath : resolve(configPath));
+    resolved = fileURLToPath(new URL(specifier, configUrl));
+  } else {
+    resolved = fileURLToPath(import.meta.resolve(specifier));
+  }
+  if (!existsSync(resolved)) throw new Error("plugin module does not exist");
+  return resolved;
 }
 
 function parseConfig(value: unknown): PluginConfig {

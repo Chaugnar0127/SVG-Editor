@@ -50,4 +50,17 @@ test("modified-star marks new nodes, compares subtrees to save point, and clears
   const redoneTree = commands.execute(["tree"]);
   assert.ok(redoneTree?.kind === "message");
   assert.equal(redoneTree.text, editedTree.text);
+
+  session.undo();
+  session.createShape("rect", "new-leaf", ["5", "6", "7", "8"], "scene");
+  const insertedTree = commands.execute(["tree"]);
+  assert.ok(insertedTree?.kind === "message");
+  assert.match(insertedTree.text, /svg \(800x600\) \*/u);
+  assert.match(insertedTree.text, /g#scene \*/u);
+  assert.match(insertedTree.text, /rect#new-leaf.*\*/u);
+
+  session.undo();
+  const restoredTree = commands.execute(["tree"]);
+  assert.ok(restoredTree?.kind === "message");
+  assert.equal(restoredTree.text, cleanTree.text);
 });
