@@ -1,0 +1,7 @@
+init
+create g scene
+create rect first 0 0 10 10
+create circle second 20 20 5
+stats
+dir
+quit

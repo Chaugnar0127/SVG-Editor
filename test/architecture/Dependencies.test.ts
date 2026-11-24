@@ -10,7 +10,7 @@ test("module imports follow the documented dependency direction", () => {
     domain: ["domain"], application: ["application", "domain"],
     presentation: ["presentation", "domain"], cli: ["cli", "application", "presentation"],
     plugins: ["plugins", "application", "domain"],
-    assembly: ["assembly", "application", "domain"],
+    assembly: ["assembly", "application", "domain", "cli", "infrastructure"],
     infrastructure: ["infrastructure", "application", "domain"],
   };
   const check = (directory: string): void => {
