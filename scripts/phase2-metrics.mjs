@@ -67,17 +67,53 @@ function decisionCount(node, root = node) {
   return count;
 }
 
-function complexity(sourceFile) {
+function functionName(node) {
+  const sourceFile = node.getSourceFile();
+  if (ts.isConstructorDeclaration(node)) return "constructor";
+  if (node.name !== undefined) return node.name.getText(sourceFile);
+
+  const parent = node.parent;
+  if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+    return `${parent.name.text} (callback)`;
+  }
+  if (ts.isPropertyDeclaration(parent) && ts.isIdentifier(parent.name)) {
+    return `${parent.name.text} (callback)`;
+  }
+  return "<anonymous callback>";
+}
+
+function functionMetrics(sourceFile, path) {
   const functions = [];
   function collect(node) {
-    if (isFunctionLike(node)) functions.push(node);
+    if (isFunctionLike(node)) {
+      functions.push({
+        path,
+        line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+        name: functionName(node),
+        complexity: 1 + decisionCount(node),
+      });
+    }
     ts.forEachChild(node, collect);
   }
   collect(sourceFile);
-  return 1 + decisionCount(sourceFile) + functions.reduce(
-    (sum, fn) => sum + 1 + decisionCount(fn),
-    0,
-  );
+  return functions;
+}
+
+function complexity(sourceFile, functions) {
+  return 1 + decisionCount(sourceFile) + functions.reduce((sum, fn) => sum + fn.complexity, 0);
+}
+
+function functionDistribution(functions) {
+  const scores = functions.map((fn) => fn.complexity);
+  const total = scores.reduce((sum, score) => sum + score, 0);
+  return {
+    count: scores.length,
+    average: scores.length === 0 ? 0 : total / scores.length,
+    max: Math.max(0, ...scores),
+    over10: scores.filter((score) => score > 10).length,
+    over20: scores.filter((score) => score > 20).length,
+    over50: scores.filter((score) => score > 50).length,
+  };
 }
 
 function analyze(ref) {
@@ -89,11 +125,13 @@ function analyze(ref) {
     const source = git("show", `${ref}:${path}`);
     const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const lineCount = source === "" ? 0 : source.split(/\r?\n/u).length - (source.endsWith("\n") ? 1 : 0);
+    const functions = functionMetrics(sourceFile, path);
     return {
       path,
       category: categoryOf(path),
       lines: lineCount,
-      complexity: complexity(sourceFile),
+      complexity: complexity(sourceFile, functions),
+      functions,
       responsibility: declarations(sourceFile),
     };
   });
@@ -102,6 +140,8 @@ function analyze(ref) {
     lines: files.filter((file) => file.category === category).reduce((sum, file) => sum + file.lines, 0),
     complexity: files.filter((file) => file.category === category)
       .reduce((sum, file) => sum + file.complexity, 0),
+    ...functionDistribution(files.filter((file) => file.category === category)
+      .flatMap((file) => file.functions)),
   }]));
   return { hash: git("rev-parse", ref), files, totals };
 }
@@ -132,7 +172,8 @@ const rows = [
   `- final: \`${before.hash}\``,
   `- p2: \`${after.hash}\``,
   "- 行数：文件中的物理行数，排除末尾换行产生的空项。",
-  "- 圈复杂度：每个模块和函数各计 1，再计入 if/循环/case/catch/条件表达式及 `&&`、`||`、`??` 决策点；按模块汇总。该规则固定在脚本中，以便两个引用可重复比较。",
+  "- 圈复杂度：模块计 1 加模块级决策点；函数各计 1 加函数体内决策点（不进入嵌套函数）。决策点包括 if/循环/case/catch/条件表达式及 `&&`、`||`、`??`。文件和分类总和包含模块基础分；函数分布单独列出，避免把汇总值当成单个函数的复杂度。",
+  "- 函数分布中的 `>10`、`>20`、`>50` 是严格大于对应数值的函数数量，用于定位，不作为自动判定结果。",
   "- 分类：内核包括 application、cli、domain、infrastructure、presentation；装配包括 `main.ts` 与 `assembly`；插件包括 `src/plugins`。",
   "",
   "## 汇总",
@@ -147,16 +188,57 @@ for (const category of categories) {
   rows.push(`| ${category} | ${old.files} | ${current.files} | ${old.lines} | ${current.lines} | ${current.lines - old.lines} | ${old.complexity} | ${current.complexity} | ${current.complexity - old.complexity} |`);
 }
 
-rows.push("", "## 文件职责与行数", "");
+rows.push(
+  "",
+  "## 函数复杂度分布",
+  "",
+  "单函数指标适合定位复杂逻辑；分类总和会随文件和函数数量增长。",
+  "",
+  "| 引用 | 分类 | 函数数 | 平均复杂度 | 最大复杂度 | >10 | >20 | >50 |",
+  "|---|---|---:|---:|---:|---:|---:|---:|",
+);
 for (const [label, result] of [["final", before], ["p2", after]]) {
-  rows.push(`### ${label}`, "", "| 文件 | 分类 | 行数 | 职责（顶层类型/函数） |", "|---|---|---:|---|");
+  const allFunctions = result.files.flatMap((file) => file.functions);
+  for (const category of categories) {
+    const stats = result.totals[category];
+    rows.push(`| ${label} | ${category} | ${stats.count} | ${stats.average.toFixed(2)} | ${stats.max} | ${stats.over10} | ${stats.over20} | ${stats.over50} |`);
+  }
+  const stats = functionDistribution(allFunctions);
+  rows.push(`| ${label} | **全部** | ${stats.count} | ${stats.average.toFixed(2)} | ${stats.max} | ${stats.over10} | ${stats.over20} | ${stats.over50} |`);
+}
+
+rows.push(
+  "",
+  "## 文件职责与复杂度",
+  "",
+);
+for (const [label, result] of [["final", before], ["p2", after]]) {
+  rows.push(`### ${label}`, "", "| 文件 | 分类 | 行数 | 文件复杂度总和 | 函数数 | 最大函数复杂度 | >10 | 职责（顶层类型/函数） |", "|---|---|---:|---:|---:|---:|---:|---|");
   for (const file of result.files) {
-    rows.push(`| \`${file.path}\` | ${file.category} | ${file.lines} | ${file.responsibility.replaceAll("|", "\\|")} |`);
+    const stats = functionDistribution(file.functions);
+    rows.push(`| \`${file.path}\` | ${file.category} | ${file.lines} | ${file.complexity} | ${stats.count} | ${stats.max} | ${stats.over10} | ${file.responsibility.replaceAll("|", "\\|")} |`);
   }
   rows.push("");
 }
 
 rows.push(
+  "## 函数明细（按复杂度降序）",
+  "",
+  "| 引用 | 文件 | 函数 | 起始行 | 圈复杂度 |",
+  "|---|---|---|---:|---:|",
+);
+for (const [label, result] of [["final", before], ["p2", after]]) {
+  const functions = result.files.flatMap((file) => file.functions)
+    .sort((left, right) => right.complexity - left.complexity
+      || left.path.localeCompare(right.path)
+      || left.line - right.line);
+  for (const fn of functions) {
+    rows.push(`| ${label} | \`${fn.path}\` | \`${fn.name.replaceAll("`", "\\`")}\` | ${fn.line} | ${fn.complexity} |`);
+  }
+}
+
+rows.push(
+  "",
   "## VS Code 扩展（单独统计）",
   "",
   "以下扩展源码指标与 CLI 重构增量分开统计；只包含 Git 引用中的 `vscode-extension/src/**/*.ts`。",
