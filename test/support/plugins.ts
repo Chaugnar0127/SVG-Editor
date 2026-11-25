@@ -7,7 +7,7 @@ import { SvgCodec } from "../../src/infrastructure/SvgCodec.js";
 import { SvgFileStore } from "../../src/infrastructure/SvgFileStore.js";
 import builtinShapesPlugin from "../../src/plugins/shapes/BuiltinShapesPlugin.js";
 
-/** 测试装配显式安装 Phase 1 图形插件，再追加当前场景需要的插件。 */
+/** 测试装配显式安装内置图形插件，再追加当前场景需要的插件。 */
 export function createTestExtensions(plugins: readonly Plugin[] = []): ExtensionRegistry {
   const extensions = new ExtensionRegistry();
   for (const plugin of [builtinShapesPlugin, ...plugins]) {

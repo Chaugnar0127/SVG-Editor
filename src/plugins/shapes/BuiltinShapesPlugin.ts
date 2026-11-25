@@ -1,16 +1,17 @@
 import type { Plugin } from "../../application/extensions/PluginContracts.js";
 import { CircleShapeProvider } from "./CircleShapeProvider.js";
+import { DiamondShapeProvider } from "./DiamondShapeProvider.js";
 import { EllipseShapeProvider } from "./EllipseShapeProvider.js";
 import { GroupShapeProvider } from "./GroupShapeProvider.js";
 import { LineShapeProvider } from "./LineShapeProvider.js";
 import { RectShapeProvider } from "./RectShapeProvider.js";
 import { TextShapeProvider } from "./TextShapeProvider.js";
 
-/** 将六种具体图形 provider 接入宿主注册表。 */
+/** 将内置图形 provider 接入宿主注册表。 */
 export class BuiltinShapesPlugin implements Plugin {
   public readonly manifest = {
     name: "builtin-shapes",
-    contributes: { shapes: ["rect", "g", "circle", "ellipse", "line", "text"] },
+    contributes: { shapes: ["rect", "g", "circle", "ellipse", "line", "text", "diamond"] },
   };
 
   public activate(context: Parameters<Plugin["activate"]>[0]): void {
@@ -21,6 +22,7 @@ export class BuiltinShapesPlugin implements Plugin {
       new EllipseShapeProvider(),
       new LineShapeProvider(),
       new TextShapeProvider(),
+      new DiamondShapeProvider(),
     ]) {
       context.registerShapeProvider(provider);
     }

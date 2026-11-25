@@ -3,6 +3,6 @@
   "type": "module",
   "main": "./BuiltinShapesPlugin.ts",
   "contributes": {
-    "shapes": ["rect", "g", "circle", "ellipse", "line", "text"]
+    "shapes": ["rect", "g", "circle", "ellipse", "line", "text", "diamond"]
   }
 }
