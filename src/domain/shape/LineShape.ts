@@ -1,4 +1,4 @@
-import type { GeometryChange, ShapeAttributes } from "./Shape.js";
+import type { GeometryChange, ShapeAttributes, ShapeSummary } from "./Shape.js";
 import { StyledShape } from "./StyledShape.js";
 
 interface LineGeometry { readonly x1: number; readonly y1: number; readonly x2: number; readonly y2: number }
@@ -16,6 +16,14 @@ export class LineShape extends StyledShape {
 
   public override attributes(): ShapeAttributes {
     return { ...this.geometry, ...super.attributes() };
+  }
+
+  public override treeSummary(): ShapeSummary {
+    const { x1, y1, x2, y2 } = this.geometry;
+    return {
+      text: `(${x1},${y1}) -> (${x2},${y2})`,
+      representedAttributes: ["x1", "y1", "x2", "y2"],
+    };
   }
 
   public override prepareMove(dx: number, dy: number): GeometryChange {

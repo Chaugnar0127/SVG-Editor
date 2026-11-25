@@ -1,5 +1,6 @@
 import type { Plugin, PluginCommand, PluginCommandContext } from "../../application/extensions/PluginContracts.js";
 import type { Shape } from "../../domain/shape/Shape.js";
+import { isContainerShape } from "../../domain/shape/Shape.js";
 
 class StatsCommand implements PluginCommand {
   public readonly name = "stats";
@@ -18,8 +19,9 @@ class StatsCommand implements PluginCommand {
     const visit = (shapes: readonly Shape[]): void => {
       for (const shape of shapes) {
         const children = shape.children();
-        if (shape.type === "g" || children.length > 0) containers++;
-        if (children.length === 0 && shape.type !== "g") {
+        if (isContainerShape(shape)) {
+          containers++;
+        } else {
           counts.set(shape.type, (counts.get(shape.type) ?? 0) + 1);
           total++;
         }

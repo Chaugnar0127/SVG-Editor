@@ -104,4 +104,8 @@ test("malformed box input rejects the read without replacing the active document
   assert.throws(() => new SvgCodec(new ShapeFactory(extensions)).decode(
     '<svg xmlns="http://www.w3.org/2000/svg"><g id="box" data-kind="box">unexpected<rect id="box-rect" x="0" y="0" width="10" height="10"/><text id="box-label" x="0" y="0">label</text></g></svg>',
   ), { message: "unexpected text in <g>" });
+
+  assert.throws(() => new SvgCodec(new ShapeFactory(extensions)).decode(
+    '<svg xmlns="http://www.w3.org/2000/svg"><g id="box" data-kind="box"><circle id="box-rect" cx="0" cy="0" r="5"/><text id="box-label" x="0" y="0">label</text></g></svg>',
+  ), { message: "invalid box structure: expected rect#box-rect" });
 });

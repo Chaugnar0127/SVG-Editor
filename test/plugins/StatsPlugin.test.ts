@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
+import { GroupShape } from "../../src/domain/shape/GroupShape.js";
 import statsPlugin from "../../src/plugins/stats/StatsPlugin.js";
 import { createTestExtensions, createTestSession } from "../support/plugins.js";
 
@@ -37,6 +38,19 @@ test("stats handles an empty document and does not add an undo step", () => {
   commands.execute(["stats"]);
   commands.execute(["undo"]);
   assert.equal(session.requireDocument().find("one"), undefined);
+});
+
+test("stats identifies empty containers by their composite capability, not their tag", () => {
+  const { session, commands } = setup();
+  session.init();
+  class CustomContainer extends GroupShape {
+    public override readonly type = "custom-container";
+  }
+  session.requireDocument().add(new CustomContainer("empty"));
+
+  assert.deepEqual(commands.execute(["stats"]), {
+    kind: "message", text: "(total 0, containers 1)",
+  });
 });
 
 test("stats requires a document and rejects arguments", () => {

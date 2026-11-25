@@ -1,4 +1,4 @@
-import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
+import type { GeometryChange, Shape, ShapeAttributes, ShapeSummary } from "./Shape.js";
 
 /** 共享 ID、呈现属性和局部恢复逻辑；几何规则仍由具体图形维护。 */
 export abstract class StyledShape implements Shape {
@@ -17,6 +17,10 @@ export abstract class StyledShape implements Shape {
 
   public children(): readonly Shape[] {
     return [];
+  }
+
+  public treeSummary(): ShapeSummary | undefined {
+    return undefined;
   }
 
   public abstract prepareMove(dx: number, dy: number): GeometryChange;

@@ -34,3 +34,28 @@ test("the registered providers read and write the original six-shape SVG model",
   const copy = codec.decode(codec.encode(document)).document;
   assert.equal(copy.require("g").children()[0]!.id, "t");
 });
+
+test("built-in providers preserve common styles on every shape during SVG readback", () => {
+  const extensions = new ExtensionRegistry();
+  assert.deepEqual(extensions.install(builtinShapesPlugin), { success: true });
+  const codec = new SvgCodec(new ShapeFactory(extensions));
+  const source = '<svg xmlns="http://www.w3.org/2000/svg">'
+    + '<rect id="r" width="10" height="5" fill="red"/>'
+    + '<circle id="c" r="3" fill="orange"/>'
+    + '<ellipse id="e" rx="4" ry="2" fill="yellow"/>'
+    + '<line id="l" x2="10" fill="green" stroke="black"/>'
+    + '<text id="t" fill="blue">label</text>'
+    + '<g id="g" fill="purple"/>'
+    + '</svg>';
+
+  const document = codec.decode(source).document;
+  assert.deepEqual(
+    document.topLevel().map((shape) => shape.attributes().fill),
+    ["red", "orange", "yellow", "green", "blue", "purple"],
+  );
+  const copy = codec.decode(codec.encode(document)).document;
+  assert.deepEqual(
+    copy.topLevel().map((shape) => shape.attributes().fill),
+    ["red", "orange", "yellow", "green", "blue", "purple"],
+  );
+});

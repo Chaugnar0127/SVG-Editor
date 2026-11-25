@@ -1,4 +1,4 @@
-import type { GeometryChange, ShapeAttributes } from "./Shape.js";
+import type { GeometryChange, ShapeAttributes, ShapeSummary } from "./Shape.js";
 import { StyledShape } from "./StyledShape.js";
 
 interface TextPosition { readonly x: number; readonly y: number }
@@ -15,6 +15,13 @@ export class TextShape extends StyledShape {
 
   public override attributes(): ShapeAttributes {
     return { ...this.position, text: this.content, ...super.attributes() };
+  }
+
+  public override treeSummary(): ShapeSummary {
+    return {
+      text: `(${this.position.x},${this.position.y}) ${JSON.stringify(this.content)}`,
+      representedAttributes: ["x", "y", "text"],
+    };
   }
 
   public override prepareMove(dx: number, dy: number): GeometryChange {

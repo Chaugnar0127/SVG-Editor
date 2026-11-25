@@ -39,6 +39,12 @@ class BoxShapeProvider implements ShapeProvider {
     if (rectangle === undefined || label === undefined) {
       throw new RangeError(`invalid box structure: missing required children for ${id}`);
     }
+    if (!(rectangle instanceof RectShape)) {
+      throw new RangeError(`invalid box structure: expected rect#${id}-rect`);
+    }
+    if (!(label instanceof TextShape)) {
+      throw new RangeError(`invalid box structure: expected text#${id}-label`);
+    }
     const box = new BoxShape(id, rectangle, label, children);
     for (const [name, value] of Object.entries(element.attributes)) {
       if (name !== this.readMarker.attribute) box.prepareSet(name, value).apply();
@@ -75,7 +81,7 @@ class BoxTypeDecorator implements TreeDecorator {
   public readonly name = "box-type-label";
 
   public decorate(target: TreeDecorationTarget): readonly string[] {
-    return target.shape?.type === "box" ? ["(box)"] : [];
+    return target.shape instanceof BoxShape ? ["(box)"] : [];
   }
 }
 

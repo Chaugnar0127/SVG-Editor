@@ -1,6 +1,12 @@
 /** 属性名到属性值的只读映射。 */
 export type ShapeAttributes = Readonly<Record<string, string | number>>;
 
+/** 图形为树形展示提供的主要信息及已包含在摘要中的属性名。 */
+export interface ShapeSummary {
+  readonly text: string;
+  readonly representedAttributes: readonly string[];
+}
+
 /**
  * 已完成校验的几何变更。
  * apply 和 undo 只提交已确定的值，不再进行可能失败的业务校验。
@@ -29,6 +35,9 @@ export interface Shape {
 
   /** 按顺序读取直接子节点；叶子返回空数组。 */
   children(): readonly Shape[];
+
+  /** 可选的多态树形摘要；未提供时由展示层列出全部属性。 */
+  treeSummary?(): ShapeSummary | undefined;
 }
 
 /** 可承载子图形的领域能力；文档结构操作只依赖此契约。 */

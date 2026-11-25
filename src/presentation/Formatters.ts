@@ -72,24 +72,10 @@ export class Formatters {
   }
 
   private describe(shape: Shape): string {
-    const values = shape.attributes();
-    if (
-      typeof values.text === "string" &&
-      typeof values.x === "number" &&
-      typeof values.y === "number"
-    ) {
-      const styles = this.attributePairs(shape, true, ["x", "y", "text"]);
-      const summary = `(${values.x},${values.y}) ${JSON.stringify(values.text)}`;
-      return `${this.label(shape)}  ${[summary, ...styles].join(" ")}`;
-    }
-    if (
-      [values.x1, values.y1, values.x2, values.y2].every(
-        (value) => typeof value === "number",
-      )
-    ) {
-      const styles = this.attributePairs(shape, true, ["x1", "y1", "x2", "y2"]);
-      const summary = `(${values.x1},${values.y1}) -> (${values.x2},${values.y2})`;
-      return `${this.label(shape)}  ${[summary, ...styles].join(" ")}`;
+    const summary = shape.treeSummary?.();
+    if (summary !== undefined) {
+      const styles = this.attributePairs(shape, true, summary.representedAttributes);
+      return `${this.label(shape)}  ${[summary.text, ...styles].join(" ")}`;
     }
     const attributes = this.attributePairs(shape, true);
 
