@@ -56,6 +56,14 @@ export class CommandRegistry {
 
   /** 空输入不执行；其他输入按命令名分发。 */
   public execute(tokens: readonly string[]): CommandResult | undefined {
+    const result = this.dispatch(tokens);
+    const warnings = this.session.takeWarnings();
+    return result?.kind === "message" && warnings.length > 0
+      ? { kind: "message", text: [...warnings, result.text].join("\n") }
+      : result;
+  }
+
+  private dispatch(tokens: readonly string[]): CommandResult | undefined {
     const name = tokens[0];
 
     if (name === undefined) {
@@ -283,7 +291,7 @@ export class CommandRegistry {
 
     return {
       kind: "message",
-      text: this.formatters.tree(document, args[0], this.extensions.treeDecorators()),
+      text: this.formatters.tree(document, args[0], this.session.treeDecorators()),
     };
   }
 

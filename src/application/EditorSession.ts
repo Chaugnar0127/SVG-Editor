@@ -14,6 +14,7 @@ import type { DocumentStore } from "./DocumentStore.js";
 import { ExtensionRegistry } from "./extensions/ExtensionRegistry.js";
 import type { AttributeHandler } from "./extensions/PluginContracts.js";
 import type { GeometryChange, Shape } from "../domain/shape/Shape.js";
+import type { TreeDecorator } from "../domain/TreeDecorator.js";
 
 /** 当前文档与只管理该文档的命令总线。 */
 interface ActiveDocument {
@@ -24,6 +25,8 @@ interface ActiveDocument {
 
 export class EditorSession {
   private current: ActiveDocument | undefined;
+  private readonly disabledDecorators = new Set<TreeDecorator>();
+  private readonly warnings: string[] = [];
 
   public constructor(
     private readonly store?: DocumentStore,
@@ -50,6 +53,15 @@ export class EditorSession {
   /** 返回当前文档的只读访问入口；尚未初始化时返回 undefined。 */
   public getDocument(): SvgDocument | undefined {
     return this.current?.document;
+  }
+
+  public treeDecorators(): readonly TreeDecorator[] {
+    return this.extensions.treeDecorators().filter((decorator) => !this.disabledDecorators.has(decorator));
+  }
+
+  /** 已提交操作的附加通知失败只产生警告，由入口取走后展示。 */
+  public takeWarnings(): readonly string[] {
+    return this.warnings.splice(0);
   }
 
   /** 帮助使用与本会话创建图形相同的注册表，无需先初始化文档。 */
@@ -172,7 +184,15 @@ export class EditorSession {
 
   /** 各装饰器保存自己的快照，供之后的树渲染比较当前内容。 */
   private markDecoratorsSaved(document: SvgDocument): void {
-    for (const decorator of this.extensions.treeDecorators()) decorator.onSaved?.(document);
+    for (const decorator of this.treeDecorators()) {
+      try {
+        decorator.onSaved?.(document);
+      } catch (error) {
+        this.disabledDecorators.add(decorator);
+        const message = error instanceof Error ? error.message : String(error);
+        this.warnings.push(`warning: tree decorator ${decorator.name} disabled: ${message}`.replace(/[\r\n]+/gu, " "));
+      }
+    }
   }
 
   /** 唯一处理器负责该属性；零个命中时沿用图形自身的 Phase 1 白名单。 */
