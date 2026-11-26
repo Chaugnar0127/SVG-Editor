@@ -1,6 +1,6 @@
 # SVG-Editor
 
-使用 TypeScript 实现的命令行 SVG 编辑器，并附带 SVG 的 VS Code 扩展。CLI 支持六种内置图形、可配置插件（`box`、`stats`、`dir` 和树标签）、撤销/重做、SVG 文件读写和树形查看。
+这是一个用 TypeScript 编写的命令行 SVG 编辑器，附带 VS Code 扩展。CLI 可以创建七种内置图形、编辑和分组、撤销和重做，以及读写 SVG 文件。插件提供带标题的矩形框、图形统计、目录列表和树形标签。
 
 ## 运行
 
@@ -18,15 +18,17 @@ pnpm build
 pnpm start
 ```
 
-Windows PowerShell 中可以使用 `pnpm.cmd`。输入 `help` 查看完整语法，`exit`、`quit` 或 EOF 结束会话。
+Windows PowerShell 中可以使用 `pnpm.cmd`。输入 `help` 查看命令及已加载图形的创建语法。输入 `exit`、`quit` 或 EOF 结束会话。
 
-默认启动会加载 `stats`、`dir`、`box` 和 `modified-star` 插件；六种内置图形始终可用。也可以用配置文件选择插件：
+启动时，CLI 优先使用 `--config` 指定的文件，其次检查当前工作目录的 `plugins.config.json`。未传 `--config` 且默认配置文件不存在时，依次加载 `stats`、`dir`、`modified-star` 和 `box`。七种内置图形始终可用。
+
+将下面的配置保存到仓库根目录的 `plugins.config.json`，再从仓库根目录运行：
 
 ```sh
 pnpm cli --config plugins.config.json
 ```
 
-示例配置中的相对模块路径以配置文件所在目录为基准；包名使用 Node.js ESM 的模块解析规则。配置模式只加载列出的可选插件，`enabled: false` 的条目会跳过，`options` 会原样传给插件的 `activate`：
+相对模块路径以配置文件所在目录为准，包名按 Node.js ESM 的规则解析。CLI 按列表顺序加载可选插件，跳过 `enabled: false` 的条目，并把 `options` 原样传给插件的 `activate`。下面的配置启用 `stats`、`dir` 和 `box`，关闭表示未保存变化的星号标签。
 
 ```json
 {
@@ -38,6 +40,8 @@ pnpm cli --config plugins.config.json
   ]
 }
 ```
+
+该配置用于 `pnpm cli`。使用编译后的 `pnpm start` 时，应把模块路径改为对应的 `./dist/plugins/…/*.js`。配置不可读或格式错误时，CLI 报错并以内置能力启动。
 
 ## 示例
 
@@ -76,9 +80,9 @@ cmd /c "node dist/main.js < examples\flowchart.txt"
 | 分类 | 命令 |
 |---|---|
 | 文档 | `init [w] [h]`、`read <file.svg>`、`save [file.svg]`、`canvas [w h]` |
-| 创建 | `create rect/circle/ellipse/line/text/g/box <id> ... [in <containerId>]` |
+| 创建 | `create rect/circle/ellipse/line/text/g/diamond <id> ... [in <containerId>]`，加载 box 插件后也可用 `create box` |
 | 编辑 | `delete <id>`、`move <id> <dx> <dy>`、`scale <id> <factor>`、`set <id> <attr> <value>` |
-| 结构 | `group <newGid> <id1> [id2...]`、`ungroup <gid>`、`addto <gid> <id>`、`front <id>`、`back <id>` |
+| 结构 | `group <newGid> <id1> [id2...]`、`ungroup <gid>`、`addto <containerId> <id>`、`front <id>`、`back <id>` |
 | 查看 | `tree [id]`、`show <id>`、`help` |
 | 插件 | `stats`、`dir` |
 | 历史与退出 | `undo`、`redo`、`exit`、`quit` |
@@ -92,35 +96,40 @@ create ellipse <id> <cx> <cy> <rx> <ry> [fill]
 create line <id> <x1> <y1> <x2> <y2> [stroke]
 create text <id> <x> <y> "content"
 create g <id>
+create diamond <id> <cx> <cy> <width> <height> [fill]
 create box <id> <x> <y> <w> <h> "label"
 ```
 
-所有创建命令都可追加 `in <containerId>`。ID 唯一且区分大小写，带空格的参数用双引号包裹，`#` 开头的整行作为注释。尺寸、半径及缩放因子必须为正的有限数，坐标可以为负数。
+所有创建命令都可追加 `in <containerId>`。ID 唯一且区分大小写，带空格的参数用双引号包裹，`#` 开头的整行作为注释。尺寸、半径及缩放因子必须为正的有限数，坐标可以为负数。菱形的 `cx`、`cy` 是中心坐标，`width` 和 `height` 是水平、竖直对角线的长度。
 
-`set` 支持 `fill`、`stroke`、`stroke-width`、各图形的几何属性，以及文本的 `text` 内容。组的样式保存在组上，使用 SVG 的继承规则；`move/scale` 递归修改后代几何值。`scale` 同时缩放位置和尺寸，以画布原点为基准，不改变描边宽度。
+`set` 支持 `fill`、`stroke`、`stroke-width`、各图形的几何属性，以及文本的 `text` 内容。普通组的样式按 SVG 规则继承。`set <boxId> fill <color>` 修改框内矩形的填充色，`set <boxId> label "新标题"` 修改框内文字。`move` 修改容器后代的坐标；`scale` 同时缩放后代的坐标和尺寸，以画布原点为基准，描边宽度保持不变。
 
-每条成功编辑占一个撤销步骤。撤销后的新编辑清空重做分支；失败不改变文档和历史。成功的 `init/read/save` 和画布尺寸修改清空并锁定历史，直到下一次编辑。查询不影响历史。
+box 的 `<id>-rect` 和 `<id>-label` 是必要部件，不能直接编辑或移出。可对 box 整体执行操作，也可以在其中添加和编辑其他图形。
 
-`group` 按原文档顺序收编，在最近公共父容器中建立新组；`ungroup` 将子节点放回原组的位置，按实验约定拒绝解散顶层容器。成功读入或保存后，无参数 `save` 使用最近成功的文件路径；`init` 清除该路径。
+每条成功编辑可撤销一次。撤销后执行新的编辑会清空重做记录。编辑失败会保留文档和历史。`init`、`read`、`save` 和修改画布尺寸成功后，会清空历史并暂停撤销和重做，直到下一条编辑成功。查询不影响历史。
+
+`group` 在待分组图形最近的共同父容器中建立新组，并按文档里的顺序移入图形。`ungroup` 将子节点提升到原组的位置，顶层容器和 box 不可解散。无参数的 `save` 使用上次成功读入或保存的路径。`init` 会清除该路径。
+
+启用 `modified-star` 后，`tree` 用 `*` 标出与最近一次成功 `init/read/save` 时内容不同的节点及祖先。新建节点立即标星，保存或撤销回保存时的内容后，星号消失。box 插件另在框的树行末尾添加 `(box)`。
 
 ## SVG 范围
 
-支持 SVG 命名空间中的六种内置元素、几何及公共样式属性、纯文本/CDATA、画布尺寸与 `viewBox`。缺少 ID 时自动分配 `标签名+序号` 并输出警告，生成 ID 会避开整个文件中已有的 ID。数值允许小数和科学计数法；读入长度还支持 `px`。
+支持 SVG 命名空间中的 `rect`、`circle`、`ellipse`、`line`、`text` 和 `g`，以及菱形使用的 `<polygon data-shape="diamond">`。可读写几何和公共样式属性、纯文本或 CDATA、画布尺寸和 `viewBox`。缺少 ID 时按“标签名加序号”分配新 ID 并输出警告，新 ID 会避开整个文件中已有的 ID。数值支持小数和科学计数法，读入长度还支持 `px`。菱形的存储格式见 [diamond 说明](docs/phase2-diamond.md)。
 
-`box` 插件将 `box` 保存为带 `data-kind="box"` 标记的 `<g>`；未加载该插件时，读入会按普通分组显示。其他不支持范围包括 `path`、CSS、`transform`、嵌套 `tspan`、外部资源和 DTD。不支持的元素或属性会使整次读入失败，原文档保留。保存通过临时文件替换目标文件；编码或写入失败不会提交会话路径和历史状态。
+`box` 插件把框保存为 `<g data-kind="box">`。关闭插件后，可以把该元素及其子节点读为普通组。读入 `path`、不符合菱形顶点约束的 `polygon`、CSS、`transform`、嵌套 `tspan`、外部资源和 DTD 时会报错并保留原文档。保存时先写临时文件，再替换目标文件。编码或写入失败时，编辑器保留原有路径和历史。
 
 `dir` 列出启动 CLI 时的当前工作目录，不随 `read` 或 `save` 改变。它显示直接子项（包括隐藏项），目录在前，文件在后，并按名称排序；符号链接等特殊项显示为 `[OTHER]`，不跟随目标。`stats` 按深度优先顺序统计叶子图形和容器。
 
 ## VS Code 扩展
 
-扩展在 Explorer 的 SVG 文件旁显示 `[]`，并在原生 Outline 视图中提供元素层级及源码定位。构建后可在仓库根目录启动扩展开发宿主：
+扩展在 Explorer 的 SVG 文件旁显示 `[]`，并在原生 Outline 视图中提供元素层级及源码定位。在仓库根目录构建并启动新的扩展开发宿主：
 
 ```sh
 pnpm build:vscode
-code --extensionDevelopmentPath=./vscode-extension .
+code --new-window "--extensionDevelopmentPath=$PWD/vscode-extension" "$PWD"
 ```
 
-打开 SVG 文件即可查看效果；对应的演示截图位于 [文件标记](docs/images/vscode-svg-badge.jpg) 和 [大纲视图](docs/images/vscode-svg-outline.jpg)。
+开发宿主启动后，可在命令面板运行 `Developer: Show Running Extensions` 确认扩展已加载。在 Explorer 中展开 `examples`，可以在 `flowchart.svg` 旁查看 `[]`。用 `Text Editor` 打开该文件，在 Outline 中展开元素并点击节点，就能跳到对应源码。界面示例见 [实验附图：文件标记](docs/images/vscode-svg-badge.jpg) 和 [实验附图：大纲定位](docs/images/vscode-svg-outline.jpg)。
 
 ## 验证与设计
 
@@ -134,4 +143,4 @@ pnpm build:vscode
 pnpm metrics
 ```
 
-测试覆盖领域不变量、混合编辑历史、CLI 输入、失败原子性、真实文件读写、插件事务与装配、实验会话和模块依赖。模块划分、扩展点契约、架构决策、VS Code 复用评估及 Phase 1/2 对比见 [架构文档](doc/README.md)；由脚本生成的源码指标见 [metrics](docs/metrics/phase2.md)。
+测试覆盖图形校验、撤销和重做、CLI 输入、命令失败后的状态、真实文件读写、插件加载、实验会话和模块依赖。设计和验收说明见 [架构文档](doc/README.md)。源码指标比较固定的 `final` 与 `p2` 标签，见 [指标报告](docs/metrics/phase2.md)。
