@@ -143,7 +143,7 @@ function analyze(ref) {
     ...functionDistribution(files.filter((file) => file.category === category)
       .flatMap((file) => file.functions)),
   }]));
-  return { hash: git("rev-parse", ref), files, totals };
+  return { tree: git("rev-parse", `${ref}:src`), files, totals };
 }
 
 function analyzeVscode(ref) {
@@ -157,20 +157,30 @@ function analyzeVscode(ref) {
     const lines = source === "" ? 0 : source.split(/\r?\n/u).length - (source.endsWith("\n") ? 1 : 0);
     return { path, lines, responsibility: declarations(sourceFile) };
   });
-  return { files, lines: files.reduce((sum, file) => sum + file.lines, 0) };
+  return {
+    tree: paths.length === 0 ? undefined : git("rev-parse", `${ref}:vscode-extension/src`),
+    files,
+    lines: files.reduce((sum, file) => sum + file.lines, 0),
+  };
 }
 
+// Before moving the release tag, pass HEAD to measure the pending p2 sources.
+const afterRef = process.argv[2] ?? "p2";
 const before = analyze("final");
-const after = analyze("p2");
+const after = analyze(afterRef);
 const beforeVscode = analyzeVscode("final");
-const afterVscode = analyzeVscode("p2");
+const afterVscode = analyzeVscode(afterRef);
 const rows = [
   "# Phase 2 源码指标",
   "",
   "本报告由 `pnpm metrics` 生成，比较 Git 引用 `final` 与 `p2`。CLI 统计范围为 `src/**/*.ts`；VS Code 扩展、测试、依赖和构建产物不计入 CLI 重构数据。",
   "",
-  `- final: \`${before.hash}\``,
-  `- p2: \`${after.hash}\``,
+  "版本以源码目录的 Git 树哈希标识；仅修改文档或包版本号不会改变这些快照。发布前可运行 `pnpm metrics HEAD` 生成待标记为 `p2` 的源码指标，标签更新后运行 `pnpm metrics` 应得到相同报告。",
+  "",
+  `- final CLI 源码树（\`src\`）: \`${before.tree}\``,
+  `- p2 CLI 源码树（\`src\`）: \`${after.tree}\``,
+  `- final VS Code 源码树（\`vscode-extension/src\`）: ${beforeVscode.tree === undefined ? "无" : `\`${beforeVscode.tree}\``}`,
+  `- p2 VS Code 源码树（\`vscode-extension/src\`）: ${afterVscode.tree === undefined ? "无" : `\`${afterVscode.tree}\``}`,
   "- 行数：文件中的物理行数，排除末尾换行产生的空项。",
   "- 圈复杂度：模块计 1 加模块级决策点；函数各计 1 加函数体内决策点（不进入嵌套函数）。决策点包括 if/循环/case/catch/条件表达式及 `&&`、`||`、`??`。文件和分类总和包含模块基础分；函数分布单独列出，避免把汇总值当成单个函数的复杂度。",
   "- 函数分布中的 `>10`、`>20`、`>50` 是严格大于对应数值的函数数量，用于定位，不作为自动判定结果。",
