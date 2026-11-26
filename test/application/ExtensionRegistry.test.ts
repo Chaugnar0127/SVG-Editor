@@ -102,3 +102,14 @@ test("duplicate registration within one activation is rejected", () => {
   });
   assert.equal(registry.command("same"), undefined);
 });
+
+test("activation cannot overwrite staged registrations through exposed maps", () => {
+  const registry = new ExtensionRegistry();
+  const result = registry.install(plugin("encapsulation", ["same"], (context) => {
+    context.registerCommand(command("same"));
+    const exposed = (context as unknown as { commands?: Map<string, PluginCommand> }).commands;
+    exposed?.set("same", { ...command("same"), help: "overwritten" });
+  }));
+  assert.deepEqual(result, { success: true });
+  assert.equal(registry.command("same")?.help, "same");
+});

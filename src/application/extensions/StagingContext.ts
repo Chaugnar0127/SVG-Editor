@@ -2,25 +2,36 @@ import type { AttributeHandler, PluginCommand, PluginContributions, PluginContex
 import { DuplicateRegistrationError } from "./DuplicateRegistrationError.js";
 
 export class StagingContext implements PluginContext {
-  public readonly shapes = new Map<string, ShapeProvider>();
-  public readonly commands = new Map<string, PluginCommand>();
-  public readonly decorators = new Map<string, TreeDecorator>();
-  public readonly attributes = new Map<string, AttributeHandler>();
+  readonly #shapes = new Map<string, ShapeProvider>();
+  readonly #commands = new Map<string, PluginCommand>();
+  readonly #decorators = new Map<string, TreeDecorator>();
+  readonly #attributes = new Map<string, AttributeHandler>();
+
+  public shapeProviders(): ReadonlyMap<string, ShapeProvider> { return new Map(this.#shapes); }
+  public commandsList(): ReadonlyMap<string, PluginCommand> { return new Map(this.#commands); }
+  public treeDecorators(): ReadonlyMap<string, TreeDecorator> { return new Map(this.#decorators); }
+  public attributeHandlers(): ReadonlyMap<string, AttributeHandler> { return new Map(this.#attributes); }
+
+  public names(category: keyof PluginContributions): readonly string[] {
+    const maps = { shapes: this.#shapes, commands: this.#commands,
+      decorators: this.#decorators, attributes: this.#attributes };
+    return [...maps[category].keys()];
+  }
 
   public registerShapeProvider(provider: ShapeProvider): void {
-    this.register("shapes", this.shapes, provider.name, provider);
+    this.register("shapes", this.#shapes, provider.name, provider);
   }
 
   public registerCommand(command: PluginCommand): void {
-    this.register("commands", this.commands, command.name, command);
+    this.register("commands", this.#commands, command.name, command);
   }
 
   public registerTreeDecorator(decorator: TreeDecorator): void {
-    this.register("decorators", this.decorators, decorator.name, decorator);
+    this.register("decorators", this.#decorators, decorator.name, decorator);
   }
 
   public registerAttributeHandler(handler: AttributeHandler): void {
-    this.register("attributes", this.attributes, handler.name, handler);
+    this.register("attributes", this.#attributes, handler.name, handler);
   }
 
   private register<T>(category: keyof PluginContributions, target: Map<string, T>, name: string, value: T): void {

@@ -50,10 +50,10 @@ export class ExtensionRegistry {
     const duplicate = this.findCommittedDuplicate(staged);
     if (duplicate !== undefined) return { success: false, failure: duplicate };
 
-    this.commit(this.shapes, staged.shapes);
-    this.commit(this.commands, staged.commands);
-    this.commit(this.decorators, staged.decorators);
-    this.commit(this.attributes, staged.attributes);
+    this.commit(this.shapes, staged.shapeProviders());
+    this.commit(this.commands, staged.commandsList());
+    this.commit(this.decorators, staged.treeDecorators());
+    this.commit(this.attributes, staged.attributeHandlers());
     return { success: true };
   }
 
@@ -68,7 +68,7 @@ export class ExtensionRegistry {
     const declared = plugin.manifest.contributes ?? {};
     for (const category of categories) {
       const expected = [...(declared[category] ?? [])].sort();
-      const actual = [...staged[category].keys()].sort();
+      const actual = [...staged.names(category)].sort();
       if (sameNames(expected, actual)) continue;
       return {
         kind: "manifest",
@@ -83,7 +83,7 @@ export class ExtensionRegistry {
   private findCommittedDuplicate(staged: StagingContext): PluginInstallFailure | undefined {
     for (const category of categories) {
       const current = this.mapFor(category);
-      for (const name of staged[category].keys()) {
+      for (const name of staged.names(category)) {
         if (current.has(name) || (category === "commands" && this.reservedCommands.has(name))) {
           return { kind: "duplicate", category, name };
         }
@@ -101,7 +101,7 @@ export class ExtensionRegistry {
     }
   }
 
-  private commit<T>(target: ContributionMap<T>, staged: ContributionMap<T>): void {
+  private commit<T>(target: ContributionMap<T>, staged: ReadonlyMap<string, T>): void {
     for (const [name, value] of staged) target.set(name, value);
   }
 }
