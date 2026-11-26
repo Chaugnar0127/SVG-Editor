@@ -1,7 +1,7 @@
-import type { GeometryChange, Shape, ShapeAttributes } from "./Shape.js";
+import type { GeometryChange, ShapeAttributes } from "./Shape.js";
 import { StyledShape } from "./StyledShape.js";
 
-export class RectShape extends StyledShape implements Shape {
+export class RectShape extends StyledShape {
   public override readonly type = "rect";
   private widthValue: number;
   private heightValue: number;
@@ -16,21 +16,9 @@ export class RectShape extends StyledShape implements Shape {
     fillValue?: string,
   ) {
     super(id);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      throw new RangeError("rectangle coordinates must be finite numbers");
-    }
-
-    if (!Number.isFinite(width) || width <= 0) {
-      throw new RangeError("rectangle width must be a positive finite number");
-    }
-
-    if (!Number.isFinite(height) || height <= 0) {
-      throw new RangeError("rectangle height must be a positive finite number");
-    }
-
-    if (fillValue !== undefined && fillValue.trim().length === 0) {
-      throw new RangeError("fill must not be empty");
-    }
+    this.finiteValues([x, y], "rectangle coordinates must be finite numbers");
+    this.positive(width, "rectangle width");
+    this.positive(height, "rectangle height");
 
     this.widthValue = width;
     this.heightValue = height;
@@ -72,49 +60,31 @@ export class RectShape extends StyledShape implements Shape {
    * 准备以原点为基准的位置与尺寸缩放，拒绝溢出及尺寸下溢到零。
    */
   public override prepareScale(factor: number): GeometryChange {
-    if (!Number.isFinite(factor) || factor <= 0) {
-      throw new RangeError("scale factor must be positive");
-    }
+    this.factor(factor);
 
     const nextWidth = this.widthValue * factor;
     const nextHeight = this.heightValue * factor;
     const nextX = this.x * factor;
     const nextY = this.y * factor;
 
-    if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight)) {
-      throw new RangeError("scaled rectangle dimensions must remain finite");
-    }
-
-    if (nextWidth <= 0 || nextHeight <= 0) {
-      throw new RangeError("scaled rectangle dimensions must remain positive");
-    }
-
-    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
-      throw new RangeError("scaled rectangle coordinates must remain finite");
-    }
+    this.finiteValues([nextWidth, nextHeight], "scaled rectangle dimensions must remain finite");
+    this.positive(nextWidth, "width", "scaled rectangle dimensions must remain positive");
+    this.positive(nextHeight, "height", "scaled rectangle dimensions must remain positive");
+    this.finiteValues([nextX, nextY], "scaled rectangle coordinates must remain finite");
 
     return this.geometryChange(nextX, nextY, nextWidth, nextHeight);
   }
 
   /** 保存原坐标和目标坐标，准备过程不改变矩形。 */
   public override prepareMove(dx: number, dy: number): GeometryChange {
-    if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
-      throw new RangeError("move offsets must be finite numbers");
-    }
+    this.finiteValues([dx, dy], "move offsets must be finite numbers");
 
     const nextX = this.x + dx;
     const nextY = this.y + dy;
 
-    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
-      throw new RangeError("moved rectangle coordinates must remain finite");
-    }
+    this.finiteValues([nextX, nextY], "moved rectangle coordinates must remain finite");
 
     return this.geometryChange(nextX, nextY, this.widthValue, this.heightValue);
-  }
-
-  /** 矩形是叶子节点，没有子节点。 */
-  public override children(): readonly Shape[] {
-    return [];
   }
 
   public override prepareSet(attribute: string, value: string): GeometryChange {
@@ -138,24 +108,15 @@ export class RectShape extends StyledShape implements Shape {
     nextWidth: number,
     nextHeight: number,
   ): GeometryChange {
-    const previousX = this.x;
-    const previousY = this.y;
-    const previousWidth = this.widthValue;
-    const previousHeight = this.heightValue;
-
-    return {
-      apply: () => {
-        this.x = nextX;
-        this.y = nextY;
-        this.widthValue = nextWidth;
-        this.heightValue = nextHeight;
+    return this.change<readonly [number, number, number, number]>(
+      [this.x, this.y, this.widthValue, this.heightValue],
+      [nextX, nextY, nextWidth, nextHeight],
+      ([x, y, width, height]) => {
+        this.x = x;
+        this.y = y;
+        this.widthValue = width;
+        this.heightValue = height;
       },
-      undo: () => {
-        this.x = previousX;
-        this.y = previousY;
-        this.widthValue = previousWidth;
-        this.heightValue = previousHeight;
-      },
-    };
+    );
   }
 }

@@ -56,14 +56,18 @@ export abstract class StyledShape implements Shape {
   }
 
   protected finite(...values: number[]): void {
+    this.finiteValues(values, "shape coordinates must remain finite");
+  }
+
+  protected finiteValues(values: readonly number[], message: string): void {
     if (!values.every(Number.isFinite)) {
-      throw new RangeError("shape coordinates must remain finite");
+      throw new RangeError(message);
     }
   }
 
-  protected positive(value: number, label: string): void {
+  protected positive(value: number, label: string, message = `${label} must be a positive finite number`): void {
     if (!Number.isFinite(value) || value <= 0) {
-      throw new RangeError(`${label} must be a positive finite number`);
+      throw new RangeError(message);
     }
   }
 
