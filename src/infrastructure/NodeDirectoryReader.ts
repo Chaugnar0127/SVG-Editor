@@ -1,6 +1,7 @@
+import { DirectoryReadError } from "../application/DirectoryReadError.js";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { DirectoryReadError, type DirectoryEntry, type DirectoryReader } from "../application/DirectoryReader.js";
+import type { DirectoryEntry, DirectoryReader } from "../application/DirectoryReader.js";
 
 /** Node 适配器在创建时固定工作目录，避免 SVG 文件路径影响目录命令。 */
 export class NodeDirectoryReader implements DirectoryReader {

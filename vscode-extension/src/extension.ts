@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { SvgFileDecorationProvider } from "./FileDecorationProvider.js";
+import { SvgFileDecorationProvider } from "./SvgFileDecorationProvider.js";
 import { SvgOutlineProvider } from "./SvgOutlineProvider.js";
 
 export function activate(context: vscode.ExtensionContext): void {

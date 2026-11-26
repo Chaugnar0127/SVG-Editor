@@ -1,9 +1,33 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import ts from "typescript";
+
+test("production classes each live in a file matching their class name", () => {
+  const violations: string[] = [];
+  const check = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name);
+      if (entry.isDirectory()) { check(file); continue; }
+      if (!entry.name.endsWith(".ts")) continue;
+      const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+      const classes: string[] = [];
+      const inspect = (node: ts.Node): void => {
+        if (ts.isClassDeclaration(node)) classes.push(node.name?.text ?? "<anonymous>");
+        ts.forEachChild(node, inspect);
+      };
+      inspect(source);
+      if (classes.length > 1 || classes.some((name) => name !== basename(file, ".ts"))) {
+        violations.push(`${file}: ${classes.join(", ")}`);
+      }
+    }
+  };
+  check(fileURLToPath(new URL("../../src", import.meta.url)));
+  check(fileURLToPath(new URL("../../vscode-extension/src", import.meta.url)));
+  assert.deepEqual(violations, []);
+});
 
 test("module imports follow the documented dependency direction", () => {
   const root = fileURLToPath(new URL("../../src", import.meta.url));
