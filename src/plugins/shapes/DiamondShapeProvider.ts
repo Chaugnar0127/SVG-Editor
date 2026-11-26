@@ -6,6 +6,7 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class DiamondShapeProvider extends BuiltinShapeProvider {
   public readonly name = "diamond";
+  public readonly usage = "create diamond <id> <cx> <cy> <width> <height> [fill]";
   public readonly readMarker = { attribute: "data-shape", value: "diamond" } as const;
 
   public override get elementName(): string {
@@ -13,7 +14,7 @@ export class DiamondShapeProvider extends BuiltinShapeProvider {
   }
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [4, 5], "create diamond <id> <cx> <cy> <width> <height> [fill]");
+    expectCount(parameters, [4, 5], `${this.usage} [in <containerId>]`);
     return new DiamondShape(
       id,
       numberAt(parameters, 0, "cx"),

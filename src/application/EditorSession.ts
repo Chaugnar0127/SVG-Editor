@@ -52,6 +52,11 @@ export class EditorSession {
     return this.current?.document;
   }
 
+  /** 帮助使用与本会话创建图形相同的注册表，无需先初始化文档。 */
+  public shapeCreationUsages(): readonly string[] {
+    return this.extensions.shapeProviders().map((provider) => provider.usage);
+  }
+
   /** 解析和模型校验全部成功后，才替换文档、路径及历史。 */
   public read(path: string): readonly string[] {
     const loaded = this.requireStore().read(path);

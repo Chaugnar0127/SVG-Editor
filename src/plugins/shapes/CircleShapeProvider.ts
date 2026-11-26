@@ -6,9 +6,10 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class CircleShapeProvider extends BuiltinShapeProvider {
   public readonly name = "circle";
+  public readonly usage = "create circle <id> <cx> <cy> <r> [fill]";
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [3, 4], "create circle <id> <cx> <cy> <r> [fill] [in <containerId>]");
+    expectCount(parameters, [3, 4], `${this.usage} [in <containerId>]`);
     return new CircleShape(
       id,
       numberAt(parameters, 0, "cx"),

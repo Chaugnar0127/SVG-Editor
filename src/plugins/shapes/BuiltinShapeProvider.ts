@@ -4,6 +4,7 @@ import { isContainerShape, type Shape } from "../../domain/shape/Shape.js";
 /** 共享内置 SVG 读回流程；每种图形的语法和构造规则由专属 provider 实现。 */
 export abstract class BuiltinShapeProvider implements ShapeProvider {
   public abstract readonly name: string;
+  public abstract readonly usage: string;
 
   public get elementName(): string {
     return this.name;

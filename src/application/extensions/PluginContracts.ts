@@ -17,6 +17,8 @@ export interface SvgElementData {
 /** 负责一种模型类型的创建及 XML 中立读写，不接触 DOM 实现。 */
 export interface ShapeProvider {
   readonly name: string;
+  /** create 命令的完整参数语法，由帮助输出和参数校验共同使用。 */
+  readonly usage: string;
   readonly elementName: string;
   readonly readMarker?: { readonly attribute: string; readonly value: string };
   create(id: string, parameters: readonly string[]): Shape;

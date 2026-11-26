@@ -3,25 +3,26 @@ import type { ShapeProvider, SvgElementData } from "../../application/extensions
 import type { Shape } from "../../domain/shape/Shape.js";
 import { RectShape } from "../../domain/shape/RectShape.js";
 import { TextShape } from "../../domain/shape/TextShape.js";
+import { expectCount, numberAt } from "../../application/arguments.js";
 
 export class BoxShapeProvider implements ShapeProvider {
   public readonly name = "box";
+  public readonly usage = 'create box <id> <x> <y> <w> <h> "label"';
   public readonly elementName = "g";
   public readonly readMarker = { attribute: "data-kind", value: "box" };
 
   /** 构造固定的矩形与标题子图形；新增子树由文档一次性校验 ID。 */
   public create(id: string, parameters: readonly string[]): BoxShape {
-    if (parameters.length !== 5) {
-      throw new RangeError('usage: create box <id> <x> <y> <w> <h> "label" [in <containerId>]');
-    }
-    const [x, y, width, height, label] = parameters;
-    if (x === undefined || y === undefined || width === undefined || height === undefined || label === undefined) {
-      throw new RangeError('usage: create box <id> <x> <y> <w> <h> "label" [in <containerId>]');
-    }
+    expectCount(parameters, [5], `${this.usage} [in <containerId>]`);
+    const x = numberAt(parameters, 0, "x");
+    const y = numberAt(parameters, 1, "y");
+    const width = numberAt(parameters, 2, "width");
+    const height = numberAt(parameters, 3, "height");
+    const label = parameters[4]!;
     return new BoxShape(
       id,
-      new RectShape(`${id}-rect`, number(x, "x"), number(y, "y"), number(width, "width"), number(height, "height")),
-      new TextShape(`${id}-label`, number(x, "x") + 20, number(y, "y") + 35, label),
+      new RectShape(`${id}-rect`, x, y, width, height),
+      new TextShape(`${id}-label`, x + 20, y + 35, label),
     );
   }
 
@@ -59,11 +60,4 @@ export class BoxShapeProvider implements ShapeProvider {
     for (const [name, value] of Object.entries(shape.attributes())) attributes[name] = String(value);
     return { name: this.elementName, attributes, text: "" };
   }
-}
-
-function number(value: string, label: string): number {
-  if (value.trim().length === 0 || !Number.isFinite(Number(value))) {
-    throw new RangeError(`${label} must be a finite number`);
-  }
-  return Number(value);
 }

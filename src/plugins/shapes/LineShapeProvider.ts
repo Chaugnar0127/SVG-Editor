@@ -6,9 +6,10 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class LineShapeProvider extends BuiltinShapeProvider {
   public readonly name = "line";
+  public readonly usage = "create line <id> <x1> <y1> <x2> <y2> [stroke]";
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [4, 5], "create line <id> <x1> <y1> <x2> <y2> [stroke] [in <containerId>]");
+    expectCount(parameters, [4, 5], `${this.usage} [in <containerId>]`);
     return new LineShape(
       id,
       numberAt(parameters, 0, "x1"),

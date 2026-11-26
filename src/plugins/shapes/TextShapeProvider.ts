@@ -6,9 +6,10 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class TextShapeProvider extends BuiltinShapeProvider {
   public readonly name = "text";
+  public readonly usage = "create text <id> <x> <y> \"content\"";
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [3], 'create text <id> <x> <y> "content" [in <containerId>]');
+    expectCount(parameters, [3], `${this.usage} [in <containerId>]`);
     return new TextShape(
       id,
       numberAt(parameters, 0, "x"),

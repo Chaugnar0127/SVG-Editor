@@ -4,6 +4,11 @@ import { ExtensionRegistry } from "../../src/application/extensions/ExtensionReg
 import { ShapeFactory } from "../../src/application/ShapeFactory.js";
 import { SvgCodec } from "../../src/infrastructure/SvgCodec.js";
 import builtinShapesPlugin from "../../src/plugins/shapes/BuiltinShapesPlugin.js";
+import boxPlugin from "../../src/plugins/box/BoxPlugin.js";
+import { EditorSession } from "../../src/application/EditorSession.js";
+import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
+import { RectShapeProvider } from "../../src/plugins/shapes/RectShapeProvider.js";
+import { BuiltinShapeProvider } from "../../src/plugins/shapes/BuiltinShapeProvider.js";
 
 test("Phase 1 shapes and the diamond extension are unavailable before registration and available after activation", () => {
   const extensions = new ExtensionRegistry();
@@ -21,6 +26,37 @@ test("Phase 1 shapes and the diamond extension are unavailable before registrati
     assert.equal(factory.create(type, type, parameters).type, type);
   }
   assert.deepEqual(extensions.shapeProviders().map(({ name }) => name), ["rect", "g", "circle", "ellipse", "line", "text", "diamond"]);
+});
+
+test("help follows registered shape syntax without requiring an initialized document", () => {
+  const extensions = new ExtensionRegistry();
+  extensions.install(builtinShapesPlugin);
+  const session = new EditorSession(undefined, extensions);
+  const commands = new CommandRegistry(session);
+  const help = () => {
+    const result = commands.execute(["help"]);
+    assert.ok(result?.kind === "message");
+    return result.text;
+  };
+  assert.match(help(), /create diamond <id> <cx> <cy> <width> <height> \[fill\]/u);
+  assert.doesNotMatch(help(), /create box/u);
+  extensions.install(boxPlugin);
+  assert.match(help(), /create box <id> <x> <y> <w> <h> "label"/u);
+
+  // A future provider supplies its own syntax without changing the CLI's help table.
+  class FutureShapeProvider extends BuiltinShapeProvider {
+    public readonly name = "future";
+    public readonly usage = "create future <id> <x> <y> <w> <h>";
+    public create(id: string, parameters: readonly string[]) {
+      return new RectShapeProvider().create(id, parameters);
+    }
+    protected parametersFromElement(): readonly string[] { return ["0", "0", "1", "1"]; }
+  }
+  extensions.install({
+    manifest: { name: "future", contributes: { shapes: ["future"] } },
+    activate: (context) => context.registerShapeProvider(new FutureShapeProvider()),
+  });
+  assert.match(help(), /create future <id> <x> <y> <w> <h>/u);
 });
 
 test("the registered providers read and write the original six-shape SVG model", () => {

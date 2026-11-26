@@ -6,9 +6,10 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class GroupShapeProvider extends BuiltinShapeProvider {
   public readonly name = "g";
+  public readonly usage = "create g <id>";
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [0], "create g <id> [in <containerId>]");
+    expectCount(parameters, [0], `${this.usage} [in <containerId>]`);
     return new GroupShape(id);
   }
 

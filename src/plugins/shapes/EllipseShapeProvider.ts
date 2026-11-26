@@ -6,9 +6,10 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class EllipseShapeProvider extends BuiltinShapeProvider {
   public readonly name = "ellipse";
+  public readonly usage = "create ellipse <id> <cx> <cy> <rx> <ry> [fill]";
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [4, 5], "create ellipse <id> <cx> <cy> <rx> <ry> [fill] [in <containerId>]");
+    expectCount(parameters, [4, 5], `${this.usage} [in <containerId>]`);
     return new EllipseShape(
       id,
       numberAt(parameters, 0, "cx"),

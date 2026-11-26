@@ -6,9 +6,10 @@ import { BuiltinShapeProvider } from "./BuiltinShapeProvider.js";
 
 export class RectShapeProvider extends BuiltinShapeProvider {
   public readonly name = "rect";
+  public readonly usage = "create rect <id> <x> <y> <w> <h> [fill]";
 
   public create(id: string, parameters: readonly string[]): Shape {
-    expectCount(parameters, [4, 5], "create rect <id> <x> <y> <w> <h> [fill] [in <containerId>]");
+    expectCount(parameters, [4, 5], `${this.usage} [in <containerId>]`);
     return new RectShape(
       id,
       numberAt(parameters, 0, "x"),
