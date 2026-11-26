@@ -48,7 +48,7 @@ export class ModifiedStarDecorator implements TreeDecorator {
     return JSON.stringify([
       shape.id,
       shape.type,
-      shape.attributes(),
+      Object.entries(shape.attributes()).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0),
       shape.children().map((child) => [child.id, child.type]),
     ]);
   }

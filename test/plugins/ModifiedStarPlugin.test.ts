@@ -12,6 +12,40 @@ const store: DocumentStore = {
   write: (_path: string, _document: SvgDocument) => {},
 };
 
+test("dirty ignores attribute insertion order but preserves values and child order", () => {
+  const extensions = createTestExtensions([modifiedStarPlugin]);
+  const session = createTestSession(store, extensions);
+  const commands = new CommandRegistry(session, extensions);
+  const tree = (): string => {
+    const result = commands.execute(["tree"]);
+    assert.ok(result?.kind === "message");
+    return result.text;
+  };
+  session.init();
+  session.createShape("rect", "r", ["0", "0", "10", "10"]);
+  session.setAttribute("r", "fill", "red");
+  session.setAttribute("r", "stroke", "blue");
+  session.save("same.svg");
+  session.deleteShape("r");
+  session.createShape("rect", "r", ["0", "0", "10", "10"]);
+  session.setAttribute("r", "stroke", "blue");
+  session.setAttribute("r", "fill", "red");
+  assert.doesNotMatch(tree(), /\*/u);
+  session.setAttribute("r", "fill", "green");
+  assert.match(tree(), /fill=green \*/u);
+  session.undo();
+  assert.doesNotMatch(tree(), /\*/u);
+
+  session.createShape("g", "group", []);
+  session.createShape("rect", "a", ["0", "0", "1", "1"], "group");
+  session.createShape("rect", "b", ["0", "0", "1", "1"], "group");
+  session.save("ordered.svg");
+  session.reorderShape("a", "front");
+  assert.match(tree(), /g#group \*/u);
+  session.undo();
+  assert.doesNotMatch(tree(), /\*/u);
+});
+
 test("box tree label composes with modified-star and follows save and undo", () => {
   const extensions = createTestExtensions([modifiedStarPlugin, boxPlugin]);
   const session = createTestSession(store, extensions);
