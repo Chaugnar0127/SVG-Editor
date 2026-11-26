@@ -1,4 +1,5 @@
 import { DOMParser, type Element } from "@xmldom/xmldom";
+import { SvgSourceRanges } from "./SvgSourceRanges.js";
 
 export interface SourcePosition {
   readonly line: number;
@@ -14,6 +15,7 @@ export interface SvgOutlineNode {
   readonly label: string;
   readonly kind: "container" | "element";
   readonly range: SourceRange;
+  readonly selectionRange: SourceRange;
   readonly children: readonly SvgOutlineNode[];
 }
 
@@ -29,7 +31,7 @@ export function parseSvgOutline(source: string): readonly SvgOutlineNode[] {
     if (root === null || root.localName !== "svg" || xml.doctype !== null) return [];
 
     const lineStarts = getLineStarts(source);
-    return [toOutlineNode(root, source, lineStarts)];
+    return [toOutlineNode(root, new SvgSourceRanges(source), lineStarts)];
   } catch {
     return [];
   }
@@ -37,19 +39,20 @@ export function parseSvgOutline(source: string): readonly SvgOutlineNode[] {
 
 function toOutlineNode(
   element: Element,
-  source: string,
+  ranges: SvgSourceRanges,
   lineStarts: readonly number[],
 ): SvgOutlineNode {
   const startOffset = offsetAt(element.lineNumber ?? 1, element.columnNumber ?? 1, lineStarts);
-  const endOffset = findOpeningTagEnd(source, startOffset);
+  const offsets = ranges.at(startOffset);
   const id = element.getAttribute("id");
   const tag = element.localName ?? element.tagName;
 
   return {
     label: id === null || id.length === 0 ? tag : `${tag}#${id}`,
     kind: tag === "svg" || tag === "g" ? "container" : "element",
-    range: { start: positionAt(startOffset, lineStarts), end: positionAt(endOffset, lineStarts) },
-    children: elementChildren(element).map((child) => toOutlineNode(child, source, lineStarts)),
+    range: { start: positionAt(startOffset, lineStarts), end: positionAt(offsets.end, lineStarts) },
+    selectionRange: { start: positionAt(startOffset, lineStarts), end: positionAt(offsets.openingEnd, lineStarts) },
+    children: elementChildren(element).map((child) => toOutlineNode(child, ranges, lineStarts)),
   };
 }
 
@@ -96,21 +99,4 @@ function positionAt(offset: number, lineStarts: readonly number[]): SourcePositi
   }
 
   return { line: low, character: offset - lineStarts[low]! };
-}
-
-function findOpeningTagEnd(source: string, start: number): number {
-  let quote: "\"" | "'" | undefined;
-
-  for (let index = start; index < source.length; index++) {
-    const character = source[index];
-    if (quote !== undefined) {
-      if (character === quote) quote = undefined;
-    } else if (character === "\"" || character === "'") {
-      quote = character;
-    } else if (character === ">") {
-      return index + 1;
-    }
-  }
-
-  return start;
 }

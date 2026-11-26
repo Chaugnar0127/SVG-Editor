@@ -14,7 +14,7 @@ export class SvgOutlineProvider implements vscode.DocumentSymbolProvider {
 function toDocumentSymbol(node: SvgOutlineNode): vscode.DocumentSymbol {
   const range = toVscodeRange(node.range);
   const kind = node.kind === "container" ? vscode.SymbolKind.Namespace : vscode.SymbolKind.Object;
-  const symbol = new vscode.DocumentSymbol(node.label, "", kind, range, range);
+  const symbol = new vscode.DocumentSymbol(node.label, "", kind, range, toVscodeRange(node.selectionRange));
 
   for (const child of node.children) symbol.children.push(toDocumentSymbol(child));
   return symbol;
