@@ -5,7 +5,7 @@
 版本以源码目录的 Git 树哈希标识；仅修改文档或包版本号不会改变这些快照。可运行 `pnpm metrics HEAD` 生成当前提交的源码指标，再用 `pnpm metrics` 核验 p2 指向的源码是否生成相同报告。
 
 - final CLI 源码树（`src`）: `90ff6767c162e9645ed3d7948af28b4deae56fe6`
-- p2 CLI 源码树（`src`）: `aead12c3c5f9d42cda29be4bc5146618c05991b5`
+- p2 CLI 源码树（`src`）: `eda822249d50123164314c02caf1a5c74d691c4a`
 - final VS Code 源码树（`vscode-extension/src`）: 无
 - p2 VS Code 源码树（`vscode-extension/src`）: `1c460f0f3299d7a92b7915e7cef0a187b75b41c2`
 - 行数：文件中的物理行数，排除末尾换行产生的空项。
@@ -17,7 +17,7 @@
 
 | 分类 | final 文件 | p2 文件 | final 行数 | p2 行数 | 行数变化 | final 圈复杂度 | p2 圈复杂度 | 复杂度变化 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| kernel | 29 | 38 | 2357 | 2739 | 382 | 577 | 656 | 79 |
+| kernel | 29 | 38 | 2357 | 2741 | 384 | 577 | 656 | 79 |
 | assembly | 1 | 3 | 11 | 261 | 250 | 1 | 91 | 90 |
 | plugins | 0 | 22 | 0 | 863 | 863 | 0 | 220 | 220 |
 
@@ -101,7 +101,7 @@
 | `src/assembly/CliHost.ts` | assembly | 18 | 2 | 1 | 1 | 0 | createCliHost |
 | `src/assembly/PluginLoader.ts` | assembly | 200 | 77 | 14 | 16 | 1 | PluginConfigEntry, PluginConfig, PluginLoader, resolvePluginModule |
 | `src/cli/CommandRegistry.ts` | kernel | 331 | 73 | 48 | 10 | 0 | CommandHandler, CommandRegistry |
-| `src/cli/Repl.ts` | kernel | 58 | 11 | 5 | 5 | 0 | Repl |
+| `src/cli/Repl.ts` | kernel | 60 | 11 | 5 | 5 | 0 | Repl |
 | `src/cli/Tokenizer.ts` | kernel | 45 | 11 | 1 | 10 | 0 | Tokenizer |
 | `src/domain/TreeDecorator.ts` | kernel | 17 | 1 | 0 | 0 | 0 | TreeDecorationTarget, TreeDecorator |
 | `src/domain/document/SvgDocument.ts` | kernel | 414 | 109 | 44 | 8 | 0 | ShapeLocation, SvgDocument |
@@ -438,7 +438,7 @@
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `install` | 28 | 5 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `findManifestMismatch` | 67 | 5 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `mapFor` | 95 | 5 |
-| p2 | `src/cli/Repl.ts` | `handleLine` | 37 | 5 |
+| p2 | `src/cli/Repl.ts` | `handleLine` | 39 | 5 |
 | p2 | `src/domain/document/SvgDocument.ts` | `constructor` | 18 | 5 |
 | p2 | `src/domain/document/SvgDocument.ts` | `search (callback)` | 351 | 5 |
 | p2 | `src/domain/document/SvgDocument.ts` | `validateDimensions` | 405 | 5 |
@@ -536,7 +536,7 @@
 | p2 | `src/cli/CommandRegistry.ts` | `move` | 198 | 2 |
 | p2 | `src/cli/CommandRegistry.ts` | `group` | 246 | 2 |
 | p2 | `src/cli/CommandRegistry.ts` | `pluginContext` | 325 | 2 |
-| p2 | `src/cli/Repl.ts` | `start` | 15 | 2 |
+| p2 | `src/cli/Repl.ts` | `start` | 16 | 2 |
 | p2 | `src/domain/document/SvgDocument.ts` | `require` | 86 | 2 |
 | p2 | `src/domain/document/SvgDocument.ts` | `containsParent (callback)` | 207 | 2 |
 | p2 | `src/domain/document/SvgDocument.ts` | `ancestry (callback)` | 282 | 2 |
@@ -684,9 +684,9 @@
 | p2 | `src/cli/CommandRegistry.ts` | `show` | 298 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `exit` | 308 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 327 | 1 |
-| p2 | `src/cli/Repl.ts` | `constructor` | 9 | 1 |
-| p2 | `src/cli/Repl.ts` | `onLine (callback)` | 22 | 1 |
-| p2 | `src/cli/Repl.ts` | `<anonymous callback>` | 28 | 1 |
+| p2 | `src/cli/Repl.ts` | `constructor` | 10 | 1 |
+| p2 | `src/cli/Repl.ts` | `onLine (callback)` | 24 | 1 |
+| p2 | `src/cli/Repl.ts` | `<anonymous callback>` | 30 | 1 |
 | p2 | `src/domain/document/SvgDocument.ts` | `width` | 31 | 1 |
 | p2 | `src/domain/document/SvgDocument.ts` | `height` | 36 | 1 |
 | p2 | `src/domain/document/SvgDocument.ts` | `viewBox` | 40 | 1 |

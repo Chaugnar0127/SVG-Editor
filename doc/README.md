@@ -115,9 +115,7 @@ skinparam componentStyle rectangle
 | assembly | assembly、application、domain、cli、infrastructure、Node 模块加载 API | 创建宿主并按配置加载插件 |
 | main.ts | 启动所需模块及默认插件 | 选择本次运行的插件集合 |
 
-`test/architecture/Dependencies.test.ts` 检查静态 import 的层级方向和领域层的外部依赖，并检查工厂、命令注册表以外按图形类型名分支的写法。检查器按目录分类，尚未自动检查插件对具体类的访问是否属于公开 API，也未禁止插件之间互相导入；这些仍需人工审查。
-
-生产代码中的类各自放在同名文件内；同一架构测试还检查 CLI 与 VS Code 扩展的类文件数量和命名，防止插件实现再次堆叠到入口文件。
+`test/architecture/Dependencies.test.ts` 检查静态 import 的层级方向和领域层的外部依赖，并检查工厂、命令注册表以外按图形类型名分支的写法。检查器按目录分类。生产代码中的类各自放在同名文件内。
 
 ### 两种插件加载方式
 
@@ -322,7 +320,7 @@ code --new-window "--extensionDevelopmentPath=$PWD/vscode-extension" "$PWD"
 
 回归测试覆盖类文件约束、内置命令重名及完整注册回滚、动态图形帮助、box 默认填充及树标签、dirty 属性顺序和子节点顺序，以及大纲的完整元素范围。
 
-此前在临时目录运行 `final` 与 `af70730` 的无可选插件基础会话，两者及预期输出的 1069 字节完全一致。这是保留的历史对照记录；本次检查验证当前代码的两种装配仍匹配同一预期输出。
+此前在临时目录运行 `final` 与 `af70730` 的无可选插件基础会话，两者及预期输出的 1069 字节完全一致。这是保留的历史对照记录。当前 CLI 的启动横幅读取根目录 `package.json` 的版本号，显示 `svg-editor 0.2.0`；会话测试仅将历史预期输出的首行更新为当前包版本，再逐字节核验两种装配的完整输出，命令结果保持原有预期。
 
 #### 双装配运行验证
 

@@ -20,6 +20,8 @@ pnpm build
 pnpm start
 ```
 
+启动时显示 `svg-editor 0.2.0`，版本号读取自根目录的 `package.json`。修改源码后需重新运行 `pnpm build`，再使用 `pnpm start` 启动构建产物。
+
 Windows PowerShell 中可以使用 `pnpm.cmd`。输入 `help` 查看命令及已加载图形的创建语法。输入 `exit`、`quit` 或 EOF 结束会话。
 
 启动时，CLI 优先使用 `--config` 指定的文件，其次检查当前工作目录的 `plugins.config.json`。未传 `--config` 且默认配置文件不存在时，依次加载 `stats`、`dir`、`modified-star`、`box` 和 `diamond`。六种基础图形始终可用。配置为 `{"plugins":[]}` 时关闭所有可选插件，恢复 Phase 1 的帮助和图形类型范围。
