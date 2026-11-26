@@ -69,6 +69,45 @@ test("invalid config starts with base capabilities and reports one error", (t) =
   assert.match(result.stdout, /error: unknown command: stats/u);
 });
 
+test("config rejects built-in command collisions, rolls back the plugin, and continues startup", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "svg-editor-command-conflict-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  writeFileSync(join(directory, "conflict.mjs"), `export default {
+    manifest: { name: "conflict", contributes: { commands: ["partial", "help"] } },
+    activate(context) {
+      for (const name of ["partial", "help"]) context.registerCommand({
+        name, usage: name, help: name, execute: () => ({ kind: "message", text: "conflicting plugin" })
+      });
+    }
+  };`);
+  writeFileSync(join(directory, "later.mjs"), `export default {
+    manifest: { name: "later", contributes: { commands: ["later"] } },
+    activate(context) {
+      context.registerCommand({ name: "later", usage: "later", help: "later",
+        execute: () => ({ kind: "message", text: "later plugin works" }) });
+    }
+  };`);
+  writeFileSync(join(directory, "plugins.config.json"), JSON.stringify({ plugins: [
+    { module: "./conflict.mjs" }, { module: "./later.mjs" },
+  ] }));
+  const result = spawnSync(process.execPath, [
+    "--import", import.meta.resolve("tsx"), fileURLToPath(new URL("../../src/main.ts", import.meta.url)),
+    "--config", "plugins.config.json",
+  ], {
+    cwd: directory, input: "help\npartial\nlater\ninit\nquit\n", encoding: "utf8",
+    timeout: 10_000, windowsHide: true,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /error: duplicate registration: commands\/help/u);
+  assert.match(result.stdout, /create rect <id>/u);
+  assert.match(result.stdout, /error: unknown command: partial/u);
+  assert.match(result.stdout, /later plugin works/u);
+  assert.match(result.stdout, /canvas 800x600 created/u);
+  assert.doesNotMatch(result.stdout, /conflicting plugin/u);
+});
+
 test("code and config assembly produce identical Phase 1, box, and command transcripts", (t) => {
   const codeDirectory = mkdtempSync(join(tmpdir(), "svg-editor-code-assembly-"));
   const configWorkingDirectory = mkdtempSync(join(tmpdir(), "svg-editor-config-assembly-"));

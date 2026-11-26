@@ -1,4 +1,5 @@
 import { StagingContext } from "./StagingContext.js";
+import { builtinCommandNames } from "../BuiltinCommands.js";
 import { DuplicateRegistrationError } from "./DuplicateRegistrationError.js";
 import type {
   AttributeHandler,
@@ -21,6 +22,7 @@ export class ExtensionRegistry {
   private readonly commands = new Map<string, PluginCommand>();
   private readonly decorators = new Map<string, TreeDecorator>();
   private readonly attributes = new Map<string, AttributeHandler>();
+  private readonly reservedCommands: ReadonlySet<string> = new Set(builtinCommandNames);
 
   /** 插件先在私有暂存区激活；所有校验通过后才一次性发布注册结果。 */
   public install(plugin: Plugin, options?: unknown): PluginInstallResult {
@@ -82,7 +84,9 @@ export class ExtensionRegistry {
     for (const category of categories) {
       const current = this.mapFor(category);
       for (const name of staged[category].keys()) {
-        if (current.has(name)) return { kind: "duplicate", category, name };
+        if (current.has(name) || (category === "commands" && this.reservedCommands.has(name))) {
+          return { kind: "duplicate", category, name };
+        }
       }
     }
     return undefined;

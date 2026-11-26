@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ExtensionRegistry } from "../../src/application/extensions/ExtensionRegistry.js";
 import type { Plugin, PluginCommand } from "../../src/application/extensions/PluginContracts.js";
+import { builtinCommandNames } from "../../src/application/BuiltinCommands.js";
 
 function command(name: string): PluginCommand {
   return {
@@ -19,6 +20,24 @@ function plugin(
 ): Plugin {
   return { manifest: { name, contributes: { commands } }, activate };
 }
+
+test("every built-in command name rejects the whole conflicting plugin", () => {
+  for (const name of builtinCommandNames) {
+    const registry = new ExtensionRegistry();
+    registry.install(plugin("kept", ["kept"], (context) => context.registerCommand(command("kept"))));
+    const result = registry.install({
+      manifest: { name: "conflict", contributes: { commands: ["partial", name], decorators: ["partial-label"] } },
+      activate(context) {
+        context.registerCommand(command("partial"));
+        context.registerTreeDecorator({ name: "partial-label", decorate: () => ["partial"] });
+        context.registerCommand(command(name));
+      },
+    });
+    assert.deepEqual(result, { success: false, failure: { kind: "duplicate", category: "commands", name } });
+    assert.deepEqual(registry.commandsList().map((entry) => entry.name), ["kept"]);
+    assert.deepEqual(registry.treeDecorators(), []);
+  }
+});
 
 test("plugin activation commits matching contributions and passes options", () => {
   const registry = new ExtensionRegistry();

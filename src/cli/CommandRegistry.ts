@@ -1,3 +1,4 @@
+import { builtinCommandNames, type BuiltinCommandName } from "../application/BuiltinCommands.js";
 import type { EditorSession } from "../application/EditorSession.js";
 import { expectCount, numberAt } from "../application/arguments.js";
 import { Formatters } from "../presentation/Formatters.js";
@@ -19,43 +20,38 @@ export class CommandRegistry {
     private readonly extensions: ExtensionRegistry = new ExtensionRegistry(),
     private readonly directoryReader?: DirectoryReader,
   ) {
-    this.handlers = new Map<string, CommandHandler>([
-      ["init", (args) => this.init(args)],
-      ["canvas", (args) => this.canvas(args)],
-      ["read", (args) => this.read(args)],
-      ["save", (args) => this.save(args)],
-      ["help", (args) => this.help(args)],
-      ["create", (args) => this.create(args)],
-      ["delete", (args) => this.deleteShape(args)],
-      ["addto", (args) => this.addTo(args)],
-      ["front", (args) => this.front(args)],
-      ["back", (args) => this.back(args)],
-      ["tree", (args) => this.tree(args)],
-      ["show", (args) => this.show(args)],
-      ["move", (args) => this.move(args)],
-      ["scale", (args) => this.scale(args)],
-      ["set", (args) => this.set(args)],
-      ["group", (args) => this.group(args)],
-      ["ungroup", (args) => this.ungroup(args)],
-      [
-        "undo",
-        (args) => {
-          expectCount(args, [0], "undo");
-          this.session.undo();
-          return { kind: "message", text: "undo complete" };
-        },
-      ],
-      [
-        "redo",
-        (args) => {
-          expectCount(args, [0], "redo");
-          this.session.redo();
-          return { kind: "message", text: "redo complete" };
-        },
-      ],
-      ["exit", (args) => this.exit(args)],
-      ["quit", (args) => this.exit(args)],
-    ]);
+    const handlers: Record<BuiltinCommandName, CommandHandler> = {
+      init: (args) => this.init(args),
+      canvas: (args) => this.canvas(args),
+      read: (args) => this.read(args),
+      save: (args) => this.save(args),
+      help: (args) => this.help(args),
+      create: (args) => this.create(args),
+      delete: (args) => this.deleteShape(args),
+      addto: (args) => this.addTo(args),
+      front: (args) => this.front(args),
+      back: (args) => this.back(args),
+      tree: (args) => this.tree(args),
+      show: (args) => this.show(args),
+      move: (args) => this.move(args),
+      scale: (args) => this.scale(args),
+      set: (args) => this.set(args),
+      group: (args) => this.group(args),
+      ungroup: (args) => this.ungroup(args),
+      undo: (args) => {
+        expectCount(args, [0], "undo");
+        this.session.undo();
+        return { kind: "message", text: "undo complete" };
+      },
+      redo: (args) => {
+        expectCount(args, [0], "redo");
+        this.session.redo();
+        return { kind: "message", text: "redo complete" };
+      },
+      exit: (args) => this.exit(args),
+      quit: (args) => this.exit(args),
+    };
+    this.handlers = new Map(builtinCommandNames.map((name) => [name, handlers[name]]));
   }
 
   /** 空输入不执行；其他输入按命令名分发。 */
