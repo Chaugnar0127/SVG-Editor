@@ -36,6 +36,9 @@ export interface Shape {
   /** 按顺序读取直接子节点；叶子返回空数组。 */
   children(): readonly Shape[];
 
+  /** 可选的树形名称；未提供时使用领域类型与 ID。 */
+  treeLabel?(): string;
+
   /** 可选的多态树形摘要；未提供时由展示层列出全部属性。 */
   treeSummary?(): ShapeSummary | undefined;
 }

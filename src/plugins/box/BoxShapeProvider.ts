@@ -21,7 +21,7 @@ export class BoxShapeProvider implements ShapeProvider {
     const label = parameters[4]!;
     return new BoxShape(
       id,
-      new RectShape(`${id}-rect`, x, y, width, height),
+      new RectShape(`${id}-rect`, x, y, width, height, "#4a90d9"),
       new TextShape(`${id}-label`, x + 20, y + 35, label),
     );
   }

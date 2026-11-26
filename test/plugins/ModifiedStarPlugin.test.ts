@@ -4,12 +4,32 @@ import type { DocumentStore } from "../../src/application/DocumentStore.js";
 import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import type { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import modifiedStarPlugin from "../../src/plugins/tree/ModifiedStarPlugin.js";
+import boxPlugin from "../../src/plugins/box/BoxPlugin.js";
 import { createTestExtensions, createTestSession } from "../support/plugins.js";
 
 const store: DocumentStore = {
   read: () => { throw new Error("not used"); },
   write: (_path: string, _document: SvgDocument) => {},
 };
+
+test("box tree label composes with modified-star and follows save and undo", () => {
+  const extensions = createTestExtensions([modifiedStarPlugin, boxPlugin]);
+  const session = createTestSession(store, extensions);
+  const commands = new CommandRegistry(session, extensions);
+  session.init();
+  session.createShape("box", "n1", ["120", "100", "160", "60", "Start"]);
+  const tree = () => commands.execute(["tree", "n1"]);
+  const dirty = tree();
+  assert.ok(dirty?.kind === "message");
+  assert.equal(dirty.text.split("\n")[0], "g#n1 * (box)");
+  session.save("box.svg");
+  const clean = tree();
+  assert.ok(clean?.kind === "message");
+  assert.equal(clean.text.split("\n")[0], "g#n1 (box)");
+  session.setAttribute("n1", "label", "Changed");
+  session.undo();
+  assert.deepEqual(tree(), clean);
+});
 
 test("modified-star marks new nodes, compares subtrees to save point, and clears after undo", () => {
   const extensions = createTestExtensions([modifiedStarPlugin]);

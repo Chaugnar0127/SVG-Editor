@@ -72,16 +72,17 @@ export class Formatters {
   }
 
   private describe(shape: Shape): string {
+    const label = shape.treeLabel?.() ?? this.label(shape);
     const summary = shape.treeSummary?.();
     if (summary !== undefined) {
       const styles = this.attributePairs(shape, true, summary.representedAttributes);
-      return `${this.label(shape)}  ${[summary.text, ...styles].join(" ")}`;
+      return `${label}  ${[summary.text, ...styles].join(" ")}`;
     }
     const attributes = this.attributePairs(shape, true);
 
     return attributes.length === 0
-      ? this.label(shape)
-      : `${this.label(shape)}  ${attributes.join(" ")}`;
+      ? label
+      : `${label}  ${attributes.join(" ")}`;
   }
 
   private label(shape: Shape): string {

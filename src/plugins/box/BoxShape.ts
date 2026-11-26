@@ -31,6 +31,8 @@ export class BoxShape extends GroupShape {
   public get rectangle(): RectShape { return this.rectangleShape; }
   public get label(): TextShape { return this.labelShape; }
 
+  public treeLabel(): string { return `g#${this.id}`; }
+
   /** 必需部件只能由 box 的属性处理器修改，不能被普通命令摘走或改写。 */
   public override canModifyChild(id: string): boolean {
     if (id === this.rectangleShape.id || id === this.labelShape.id) return false;

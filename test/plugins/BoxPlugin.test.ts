@@ -21,6 +21,7 @@ test("box is an atomic composite container with reversible fill and label attrib
   const box = session.requireDocument().require("n1");
   assert.equal(box.type, "box");
   assert.deepEqual(box.children().map(({ id }) => id), ["n1-rect", "n1-label"]);
+  assert.equal(box.children()[0]!.attributes().fill, "#4a90d9");
   assert.throws(() => session.createShape("box", "n1", ["0", "0", "10", "10", "duplicate"]), {
     message: "id already exists: n1",
   });
@@ -33,7 +34,7 @@ test("box is an atomic composite container with reversible fill and label attrib
   commands.execute(["set", "n1", "fill", "#f5a623"]);
   assert.equal(box.children()[0]!.attributes().fill, "#f5a623");
   commands.execute(["undo"]);
-  assert.equal(Object.hasOwn(box.children()[0]!.attributes(), "fill"), false);
+  assert.equal(box.children()[0]!.attributes().fill, "#4a90d9");
   commands.execute(["redo"]);
   assert.equal(box.children()[0]!.attributes().fill, "#f5a623");
 
@@ -44,14 +45,14 @@ test("box is an atomic composite container with reversible fill and label attrib
   commands.execute(["redo"]);
   assert.equal(box.children()[1]!.attributes().text, "Processing v2");
 
-  assert.throws(() => session.ungroupShape("n1"), { message: "cannot ungroup protected container: n1" });
+  assert.throws(() => session.ungroupShape("n1"), { message: "cannot ungroup composite shape: n1" });
   assert.throws(() => session.deleteShape("n1-rect"), { message: "cannot modify required child: n1-rect" });
   assert.throws(() => session.addTo("n1", "n1-label"), { message: "cannot modify required child: n1-label" });
   assert.throws(() => session.moveShape("n1-rect", 1, 0), { message: "cannot modify required child: n1-rect" });
   assert.throws(() => session.setAttribute("n1-rect", "fill", "red"), {
     message: "cannot modify required child: n1-rect",
   });
-  assert.match(new Formatters().tree(session.requireDocument(), undefined, extensions.treeDecorators()), /box#n1 \(box\)/u);
+  assert.match(new Formatters().tree(session.requireDocument(), undefined, extensions.treeDecorators()), /g#n1 \(box\)/u);
 });
 
 test("box moves as a nested composite and serializes with a marker that controls readback", () => {
@@ -71,11 +72,13 @@ test("box moves as a nested composite and serializes with a marker that controls
   const loaded = codec.decode(source).document;
   assert.equal(loaded.require("nested").type, "box");
   assert.equal(loaded.require("nested-label").attributes().text, "Label");
+  assert.equal(loaded.require("nested-rect").attributes().fill, "#4a90d9");
 
   const plainCodec = createTestCodec();
   const downgraded = plainCodec.decode(source).document.require("nested");
   assert.equal(downgraded.type, "g");
   assert.deepEqual(downgraded.children().map(({ id }) => id), ["nested-rect", "nested-label"]);
+  assert.equal(downgraded.children()[0]!.attributes().fill, "#4a90d9");
 });
 
 test("malformed box input rejects the read without replacing the active document", () => {

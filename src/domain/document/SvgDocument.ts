@@ -316,7 +316,7 @@ export class SvgDocument {
   /** 解散嵌套组，子节点占据原组的位置；显式样式下放以保留继承外观。 */
   public prepareUngroup(id: string): GeometryChange {
     const group = this.requireContainer(id);
-    if (!group.ungroupable) throw new RangeError(`cannot ungroup protected container: ${id}`);
+    if (!group.ungroupable) throw new RangeError(`cannot ungroup composite shape: ${id}`);
     const location = this.locate(group);
     if (location.parent === null) throw new RangeError(`cannot ungroup top-level container: ${id}`);
     const children = group.children();
