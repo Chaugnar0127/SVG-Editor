@@ -175,7 +175,7 @@ const rows = [
   "",
   "本报告由 `pnpm metrics` 生成，比较 Git 引用 `final` 与 `p2`。CLI 统计范围为 `src/**/*.ts`；VS Code 扩展、测试、依赖和构建产物不计入 CLI 重构数据。",
   "",
-  "版本以源码目录的 Git 树哈希标识；仅修改文档或包版本号不会改变这些快照。发布前可运行 `pnpm metrics HEAD` 生成待标记为 `p2` 的源码指标，标签更新后运行 `pnpm metrics` 应得到相同报告。",
+  "版本以源码目录的 Git 树哈希标识；仅修改文档或包版本号不会改变这些快照。可运行 `pnpm metrics HEAD` 生成当前提交的源码指标，再用 `pnpm metrics` 核验 p2 指向的源码是否生成相同报告。",
   "",
   `- final CLI 源码树（\`src\`）: \`${before.tree}\``,
   `- p2 CLI 源码树（\`src\`）: \`${after.tree}\``,

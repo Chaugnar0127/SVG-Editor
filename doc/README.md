@@ -19,11 +19,10 @@ src/
     StagingContext.ts                  # 保存当前插件的暂存注册项
     DuplicateRegistrationError.ts      # 重复注册错误
   application/BuiltinCommands.ts       # 内置命令名称，供分发和冲突检查共用
-  application/DirectoryReader.ts        # dir 使用的目录访问端口
+  application/DirectoryReader.ts        # dir 使用的目录访问接口
   application/DirectoryReadError.ts     # 目录访问错误及路径
   infrastructure/NodeDirectoryReader.ts # Node 文件系统适配器
   domain/TreeDecorator.ts               # 树标签接口，供应用和展示层共用
-  domain/shape/DiamondShape.ts          # 菱形几何、属性和撤销所需的变更记录
   plugins/
     shapes/BuiltinShapeProvider.ts      # 内置图形共用的 SVG 读回流程
     shapes/RectShapeProvider.ts         # 矩形创建与读回
@@ -32,8 +31,10 @@ src/
     shapes/EllipseShapeProvider.ts      # 椭圆创建与读回
     shapes/LineShapeProvider.ts         # 直线创建与读回
     shapes/TextShapeProvider.ts         # 文本创建与读回
-    shapes/DiamondShapeProvider.ts      # 菱形创建及 polygon 读写
-    shapes/BuiltinShapesPlugin.ts       # 注册七种内置图形提供器
+    diamond/DiamondShape.ts             # 菱形几何、属性及可撤销变更
+    diamond/DiamondShapeProvider.ts     # 独立 polygon 读写提供器
+    diamond/DiamondPlugin.ts            # 注册可单独禁用的 diamond
+    shapes/BuiltinShapesPlugin.ts       # 注册六种基础图形提供器
     stats/StatsPlugin.ts                # 注册 stats
     stats/StatsCommand.ts               # 统计叶子和容器
     dir/DirPlugin.ts                    # 注册 dir
@@ -120,7 +121,7 @@ skinparam componentStyle rectangle
 
 ### 两种插件加载方式
 
-代码装配由 `src/main.ts` 调用 `PluginLoader.install(plugin, options)`。配置装配由 `PluginLoader.loadConfig(path)` 加载模块，读取清单后调用同一个 `install`。插件都在暂存注册表中运行 `activate`；清单、名称校验通过后，注册结果才加入正式注册表。
+代码装配由 `src/main.ts` 调用 `PluginLoader.install(plugin, moduleUrl, options)`。配置装配由 `PluginLoader.loadConfig(path)` 加载模块，再调用同一个 `install` 读取并校验清单。暂存 Map 使用私有字段，只向校验过程返回独立快照，无法通过外部 set/delete 绕过注册校验。插件都在暂存注册表中运行 `activate`；清单、名称校验通过后，注册结果才加入正式注册表。
 
 代码装配的最小示例：
 
@@ -133,14 +134,17 @@ import boxPlugin from "./plugins/box/BoxPlugin.js";
 
 const extensions = new ExtensionRegistry();
 const loader = new PluginLoader(extensions);
-for (const plugin of [builtinShapesPlugin, boxPlugin]) {
-  const error = loader.install(plugin);
+for (const [plugin, moduleUrl] of [
+  [builtinShapesPlugin, new URL("./plugins/shapes/BuiltinShapesPlugin.js", import.meta.url)],
+  [boxPlugin, new URL("./plugins/box/BoxPlugin.js", import.meta.url)],
+] as const) {
+  const error = loader.install(plugin, moduleUrl);
   if (error !== undefined) console.log(error);
 }
 createCliHost(extensions).start();
 ```
 
-示例路径相对 `src/main.ts`。默认入口始终安装内置图形。可选插件优先取自 `--config <path>`，否则检查当前工作目录的 `plugins.config.json`。未传 `--config` 且默认文件不存在时，依次安装 stats、dir、modified-star 和 box。
+示例路径相对 `src/main.ts`。默认入口始终安装内置图形。可选插件优先取自 `--config <path>`，否则检查当前工作目录的 `plugins.config.json`。未传 `--config` 且默认文件不存在时，依次安装 stats、dir、modified-star、box 和 diamond。
 
 将下面的配置保存为仓库根目录的 `plugins.config.json`，执行 `pnpm cli --config plugins.config.json`。省略 `--config` 也会自动读取该文件。
 
@@ -150,7 +154,8 @@ createCliHost(extensions).start();
     { "module": "./src/plugins/stats/StatsPlugin.ts" },
     { "module": "./src/plugins/dir/DirPlugin.ts" },
     { "module": "./src/plugins/tree/ModifiedStarPlugin.ts" },
-    { "module": "./src/plugins/box/BoxPlugin.ts", "options": {} }
+    { "module": "./src/plugins/box/BoxPlugin.ts", "options": {} },
+    { "module": "./src/plugins/diamond/DiamondPlugin.ts" }
   ]
 }
 ```
@@ -160,7 +165,7 @@ createCliHost(extensions).start();
 | `plugins` | 必填数组，按数组顺序加载；空数组关闭全部可选插件 |
 | `module` | 必填的非空字符串，指向带默认导出的插件对象；相对路径以配置文件目录为准 |
 | `enabled` | 可选布尔值，省略时加载；`false` 时完全跳过模块导入 |
-| `options` | 可选任意 JSON 值，原样传给 `activate(context, options)`；现有四个可选插件均不使用它 |
+| `options` | 可选任意 JSON 值，原样传给 `activate(context, options)`；现有五个可选插件均不使用它 |
 
 包名使用加载器运行环境的 ESM 解析规则。上面的源码配置供 `pnpm cli` 使用；编译后的 `node dist/main.js` 应配置对应的 `dist/plugins/…/*.js` 路径。配置不可读或格式错误时，输出 `error: invalid plugin config`，只保留内置图形和命令，继续启动。
 
@@ -186,9 +191,9 @@ createCliHost(extensions).start();
 
 | 接口 | 职责与内核调用位置 | 实现 | 禁用时的行为 | 违反契约时 |
 |---|---|---|---|---|
-| `ShapeProvider` | 创建及读回/写出图形；`src/application/ShapeFactory.ts` 的 `create/fromElement/toElement` | `BuiltinShapesPlugin` 注册七个提供器，`BoxPlugin` 注册 `BoxShapeProvider` | 关闭可选插件时七种内置图形仍可用；box 标记的 `<g>` 按普通组读回 | 同名或清单不一致时拒绝插件；同优先级多个读取器或多个写入器命中时报错 |
+| `ShapeProvider` | 创建及读回/写出图形；`src/application/ShapeFactory.ts` 的 `create/fromElement/toElement` | `BuiltinShapesPlugin` 注册六个提供器，`BoxPlugin` 和 `DiamondPlugin` 各提供一种扩展图形 | 关闭可选插件时六种基础图形仍可用；diamond 不再注册；box 标记的 `<g>` 按普通组读回 | 同名或清单不一致时拒绝插件；同优先级多个读取器或多个写入器命中时报错 |
 | `PluginCommand`（实验中的 `Command` 扩展点） | 命令分发与帮助；`src/cli/CommandRegistry.ts` 的 `execute/help` | `StatsPlugin`、`DirPlugin` | 未注册命令报 `error: unknown command: <name>` | 与已注册插件命令或内置命令同名时拒绝安装；参数错误由命令报告 usage |
-| `TreeDecorator` | `src/presentation/Formatters.ts` 的 `tree/decoration` 调用 `prepare/decorate`；`src/application/EditorSession.ts` 的 `markDecoratorsSaved` 调用 `onSaved` | `ModifiedStarPlugin`、`BoxPlugin` | 无树标签插件时保留 Phase 1 树输出 | 同名注册拒绝安装；回调异常向上传递；宿主不隔离插件对文档的直接修改 |
+| `TreeDecorator` | `src/presentation/Formatters.ts` 的 `tree/decoration` 调用 `prepare/decorate`；`src/application/EditorSession.ts` 的 `markDecoratorsSaved` 调用 `onSaved` | `ModifiedStarPlugin`、`BoxPlugin` | 无树标签插件时保留 Phase 1 树输出 | 同名注册拒绝安装；`onSaved` 抛错时警告并在本会话停用该标签，继续其余通知；渲染异常正常报告 |
 | `AttributeHandler` | `src/application/EditorSession.ts` 的 `prepareAttributeChange` 选择处理器，`commands/SetAttributeCommand.ts` 的 `execute` 提交变更 | `BoxPlugin` 的 `box-attributes` | 无命中时使用图形原有属性白名单 | 多个命中时拒绝修改；`apply` 抛错后调用 `undo`，成功回滚时保留原文档和历史 |
 
 内置图形各有一个 `ShapeProvider` 实现，提供器必须用 `usage` 给出创建语法，供 `help` 显示；新增 provider 后不再修改 CLI 的帮助表。`EditorSession.shapeCreationUsages` 从本会话的注册表读取语法，未初始化文档也能查询。已有外部 provider 接入此版本时需补充 `usage`。`BuiltinShapeProvider` 封装公共 SVG 属性处理和容器子节点装配。类型名到 provider 的解析由 `ShapeFactory` 和 `ExtensionRegistry` 完成。
@@ -244,11 +249,29 @@ createCliHost(extensions).start();
 
 同一行的标签按注册顺序拼接。默认顺序为 `modified-star`、`box-type-label`，因此新建 box 显示为 `g#n1 * (box)`。保存后显示为 `g#n1 (box)`。标签前的 `g#n1` 由 `BoxShape.treeLabel` 提供。测试见 `test/plugins/ModifiedStarPlugin.test.ts`。
 
-#### ADR-4：配置清单从插件包元数据校验
+保存通知在文档操作成功提交后执行。`onSaved` 失败不会把已成功的 init/read/save 报告为失败；会话收集单行 warning、停用失效标签并继续通知其他标签。CLI 取出警告后与成功摘要一同输出。此通知接口仅用于维护标签状态，不允许修改文档。相关回归见 `test/application/DecoratorFailure.test.ts`。
 
-配置加载器先解析模块路径并导入默认插件对象，再向上寻找最近的 `package.json`。该文件有 `main` 或 `exports` 时，使用其中的名称和 `contributes` 校验注册结果；缺少入口字段或未找到包文件时，使用插件对象的 `manifest`。代码装配直接使用对象清单。
+#### ADR-4：两种装配共用包清单校验
+
+两种装配都将插件对象、模块 URL 和 options 交给 `PluginLoader.install`。该入口向上寻找最近的 `package.json`，存在 `contributes`、`main` 或 `exports` 时使用包名称与声明校验；`contributes` 不依赖入口字段是否存在。无插件包元数据的独立模块才回退到对象清单。代码装配须显式传入模块 URL；配置装配仅额外负责解析和导入。构建脚本复制各插件包清单到 dist，并把 main 的 .ts 后缀改为 .js，保证编译前后也采用同一份声明。
 
 插件激活后，注册表检查声明与实际注册的类别、名称是否一致，再检查与已安装插件及内置命令是否重名，全部通过后才提交。内置命令名称集中于 `BuiltinCommands.ts`，CLI 分发表通过完整的 `Record<BuiltinCommandName, CommandHandler>` 保持对应。冲突插件的全部暂存注册均丢弃，后续插件继续加载。顶层模块不存在与模块、依赖求值失败分别报错。配置测试覆盖包清单覆盖对象声明、加载失败和注册回滚，见 `test/assembly/PluginLoader.test.ts` 和 `PluginConfigWorkflow.test.ts`。
+
+### diamond 判断框
+
+diamond 对应 Phase 2 的选做形状扩展，使用 `ShapeProvider` 注册创建和 SVG 读写功能。其模型、提供器和注册入口均位于 `src/plugins/diamond`，仅依赖公开领域抽象与扩展接口，可单独启用或禁用。默认代码装配启用它，空配置不加载它。支持 `move`、`scale`、`set`、撤销和重做。
+
+```text
+create diamond <id> <cx> <cy> <width> <height> [fill] [in <containerId>]
+```
+
+`cx`、`cy` 是中心坐标，可以为负数；`width`、`height` 是水平和竖直对角线的长度，必须为正的有限数。SVG 使用带 `data-shape="diamond"` 标记的 `<polygon>` 保存四个顶点：
+
+```xml
+<polygon id="decision" data-shape="diamond" points="40,30 80,50 40,70 0,50" fill="gold"/>
+```
+
+读入时要求四个顶点按顺时针或逆时针排列，且两条对角线分别平行于坐标轴。无效几何会使整次读入失败，原文档保留。样式随图形一同保存和读回。测试覆盖几何校验、CLI 编辑与撤销、注册、SVG 往返和无效多边形拒绝。
 
 ### VS Code 扩展与 Phase 1 复用
 
@@ -271,24 +294,33 @@ code --new-window "--extensionDevelopmentPath=$PWD/vscode-extension" "$PWD"
 
 演示使用 [flowchart.svg](../examples/flowchart.svg)。在 Explorer 中展开 `examples` 查看文件标记，再用 `Text Editor` 打开 SVG。展开 Outline 中的分组并点击叶子节点，检查源码定位；修改元素 ID 后检查大纲更新，暂时删掉闭合标签后检查大纲清空。
 
-[文件标记示例](../docs/images/vscode-svg-badge.jpg) 和 [大纲定位示例](../docs/images/vscode-svg-outline.jpg) 是实验附图的副本，仅说明目标界面。本项目扩展运行时的截图仍待补充。`test/vscode-extension` 验证文件筛选规则及解析函数的嵌套、无 ID、位置、文本更新和不完整 XML 行为；这些测试未启动 VS Code 宿主。
+图 1 展示 Explorer 中的文件标记：`flowchart.svg` 旁显示 `[]`，`flowchart.txt` 和 `examples` 目录不显示标记，文件名保持不变。
+
+![SVG 文件标记运行效果](../docs/images/vscode-svg-badge.png)
+
+图 2 展示 Outline 中的根元素、嵌套分组和叶子节点。选中 `text#start-label` 后，右侧定位到第 6 行的 `<text>` 元素；无 ID 的根元素显示为 `svg`。
+
+![SVG 大纲与源码定位运行效果](../docs/images/vscode-svg-outline.png)
+
+`test/vscode-extension` 验证文件筛选规则，以及解析函数的嵌套、无 ID、源码位置、文本更新和不完整 XML 行为。自动测试直接调用筛选和解析函数，无需启动 VS Code 宿主。
 
 ### 验收与指标
 
-2026-11-26，对版本号更新提交 `12fccb9`（0.2.0）执行以下检查。该版本已包含类文件拆分、插件注册回滚、动态图形帮助、box 默认样式、dirty 状态和大纲范围的修正；后续文档与指标更新不改变被测业务源码。
+2026-11-26，对本次修复后的 0.2.0 源码执行以下检查，覆盖注册表封装、双装配包清单、标签通知异常、矩形精确恢复及 diamond 独立接入。
 
 | 检查 | 结果 |
 |---|---|
 | `pnpm typecheck` | 业务代码类型检查通过 |
 | `pnpm typecheck:test` | 测试代码类型检查通过 |
 | `pnpm typecheck:vscode` | VS Code 扩展类型检查通过 |
-| `pnpm test --test-reporter=spec` | 242 项通过，0 失败，包含三组双装配会话与架构约束检查 |
+| `pnpm test --test-reporter=spec` | 245 项通过，0 失败，包含三组双装配会话与架构约束检查 |
 | `pnpm build` | CLI 构建通过 |
 | `pnpm build:vscode` | VS Code 扩展构建通过 |
+| `node scripts/verify-diamond-evidence.mjs` | diamond A/B 提交差异符合约束，1615 字节输出与 SVG 一致，禁用时对齐 final |
 
 插件、目录适配器、属性回滚、box 结构、dirty 状态和配置加载的测试分别位于 `test/plugins`、`test/application`、`test/assembly`。VS Code 的验证范围见上一节。下方的 194 项测试结果只属于 Phase 1 历史记录。
 
-回归测试覆盖类文件约束、内置命令重名及完整注册回滚、动态图形帮助、box 默认填充及树标签、dirty 属性顺序和子节点顺序，以及大纲的完整元素范围。大纲验证使用自动测试，本次未启动 VS Code 宿主进行界面复测。
+回归测试覆盖类文件约束、内置命令重名及完整注册回滚、动态图形帮助、box 默认填充及树标签、dirty 属性顺序和子节点顺序，以及大纲的完整元素范围。
 
 此前在临时目录运行 `final` 与 `af70730` 的无可选插件基础会话，两者及预期输出的 1069 字节完全一致。这是保留的历史对照记录；本次检查验证当前代码的两种装配仍匹配同一预期输出。
 
@@ -310,27 +342,35 @@ pnpm exec tsx --test test/assembly/PluginConfigWorkflow.test.ts
 
 这些测试用于验证两种装配下的行为一致。基础会话还与 `final` 做了上述历史对照；box 和新增命令使用对应预期输出，运行结果应结合被测代码版本检查。
 
-#### 插件接入的提交证据
+#### diamond 插件接入的提交证据
 
-以下命令可核查 box 首次接入的变更。PowerShell 中保留引号：
+本节以 diamond 验证同一个插件的两种接入方式。准备提交先移除原先内置的 diamond，恢复六种基础图形；它属于重构准备，不计入零内核改动的接入证明。以下两个演示提交均直接基于该准备提交。
+
+| 作用 | 分支 | 提交 | 运行文件变化 |
+|---|---|---|---|
+| 准备基线 | `evidence/diamond-base` | `cce91c8` | 恢复六种基础图形，完成宿主准备 |
+| A：代码装配 | `evidence/diamond-code` | `54cb4c5` | 新增 `src/plugins/diamond`，只修改顶层 `src/main.ts` |
+| B：配置装配 | `evidence/diamond-config` | `0e767f2` | 新增相同插件，只增加根目录 `plugins.config.json` |
+
+两个接入提交还新增了相同的插件测试文件；没有依赖或锁文件变更。新增插件之外的内核、加载器和既有插件均无变化。复查命令：
 
 ```sh
-git show --name-status --format=oneline a8b1f1f
-git ls-tree --name-only "a8b1f1f^" src/
-git diff "a8b1f1f^" a8b1f1f -- src ":(exclude)src/plugins/box/**"
+git diff --name-status evidence/diamond-base evidence/diamond-code
+git diff --name-status evidence/diamond-base evidence/diamond-config
+git diff evidence/diamond-base evidence/diamond-code -- src/application src/cli src/domain src/infrastructure src/presentation src/assembly src/plugins ":(exclude)src/plugins/diamond/**"
+git diff evidence/diamond-base evidence/diamond-config -- src ":(exclude)src/plugins/diamond/**"
+node scripts/verify-diamond-evidence.mjs
 ```
 
-`a8b1f1f` 只新增 box 的两个源码文件及一个测试文件；排除新插件目录后的 `src` 差异为空。不过该提交没有新增顶层装配或配置演示，当前历史尚未提供满足 lab §6 全部差异判据的独立 A/B 接入提交。
-
-dir 的首次接入提交 `d41f319` 同时修改了 `DirectoryReader` 并新增 `NodeDirectoryReader`，因此该提交也不满足“接入插件时内核改动为零”的要求。双装配运行测试不能替代这些提交差异证明。
+核验脚本先检查两个演示提交的父提交和变化路径，再从 Git 导出两个版本，在同一固定工作目录回放 help、创建、移动、缩放、属性修改、undo/redo、树、统计和 SVG 读写。两次输出均为 1615 字节且逐字节相同，保存的 SVG 也相同。关闭可选插件后，help、diamond 未知类型错误和空树输出与 `final` 逐字节相同。脚本可从 main 运行，无需切换分支；需要 Node、tsx 和 tar。
 
 #### 指标对应的版本
 
 `pnpm metrics` 按 [生成脚本](../scripts/phase2-metrics.mjs) 读取 Git 历史，生成 [指标报告](../docs/metrics/phase2.md)。报告包括文件清单、顶层类型和函数、内核/装配/插件三类行数，以及函数和文件的圈复杂度。
 
-比较范围为 Phase 1 基线 `final=41a3aa3` 与 0.2.0 的 `p2`。`p2` 指向本次版本和文档整理完成后的提交，包含树标签优化、双装配会话测试、图形提供器与类文件拆分、diamond，以及插件契约和大纲范围等收尾修正。
+比较范围为 Phase 1 基线 `final=41a3aa3` 与 0.2.0 的 `p2`。该版本包含树标签优化、双装配会话测试、图形提供器与类文件拆分、diamond，以及插件契约和大纲范围等修正。
 
-报告记录两个版本的 `src` 与 `vscode-extension/src` Git 树哈希，直接标识被统计的源码内容，避免文档提交改变提交哈希而使报告失效。发布前可用 `pnpm metrics HEAD` 生成待标记为 `p2` 的指标；标签更新后，`pnpm metrics` 应生成相同内容。可用 `git rev-parse p2:src p2:vscode-extension/src` 核对报告中的源码树。
+报告用 `src` 与 `vscode-extension/src` 的 Git 树哈希标识被统计的源码。仅修改文档不会改变这些源码树。本次使用 `pnpm metrics HEAD` 生成指标，并按本次修订要求将本地 `p2` 更新到最终提交；之后 `pnpm metrics` 应生成相同内容。可用 `git rev-parse p2:src p2:vscode-extension/src` 核对报告。
 
 VS Code 扩展在报告中单独统计，测试、依赖和构建产物排除。指标反映上述源码快照，不包括未提交的源码修改。
 
@@ -346,15 +386,17 @@ VS Code 扩展在报告中单独统计，测试、依赖和构建产物排除。
 | dirty 查询重复构造整棵子树的内容记录 | `be25a08` 改为一次后序遍历，并补充插入、删除、撤销和保存状态的测试 |
 | 两种装配缺少完整会话对照 | `65c0e7c` 提取共用宿主，新增三组输入、预期输出及进程测试 |
 | 图形类型判断仍散落在提供器、统计和展示代码中 | `cb7058c` 拆分各图形提供器，增加容器能力和展示接口，并加入类型名分支检查 |
-| 验证新增形状的接入方式 | `da043df` 增加 diamond 模型和提供器，并在内置插件中注册；格式和操作见 [diamond 说明](../docs/phase2-diamond.md) |
+| 验证新增形状的接入方式 | `cce91c8` 准备六种基础图形；`54cb4c5` 与 `0e767f2` 分别演示独立 diamond 的代码和配置接入，见下述提交证据 |
 
 ### Phase 2 一致性自查
 
-模块目录与上面的当前架构一致。`TreeDecorator` 定义在 domain，应用接口文件将其转出，展示层直接依赖 domain。图形创建和 XML 读写由各 provider 实现，`ShapeFactory` 负责选择 provider。编辑历史仍使用 Command，分组和 box 复用 Composite 的递归操作。
+模块目录与上面的当前架构一致。`TreeDecorator` 定义在 domain，应用接口文件将其转出，展示层直接依赖 domain。
 
-新增图形时需要实现图形类和 provider，再选择代码或配置方式注册。新增命令可实现 `PluginCommand`；新增标签可实现 `TreeDecorator`；新增属性语义可实现 `AttributeHandler`。当前 diamond 放在内置图形插件中，始终启用，尚未做成能单独禁用的包。
+各 provider 负责创建和读入图形，`ShapeFactory` 负责选择 provider。普通六种图形由 `SvgCodec` 默认写出；box 和 diamond 由 provider 提供自定义 SVG 表示，再交给 `SvgCodec` 生成 XML。编辑历史使用 Command，分组和 box 复用 Composite 的递归操作。
 
-0.2.0 的类文件约束、静态依赖和类型分支检查通过，`p2` 覆盖上述收尾代码及文档。仍需人工核验的交付项是 VS Code 实际运行截图和符合差异判据的 A/B 插件接入提交；相关限制见前文。
+新增图形时需要实现图形类和 provider，再选择代码或配置方式注册。新增命令可实现 `PluginCommand`；新增标签可实现 `TreeDecorator`；新增属性语义可实现 `AttributeHandler`。
+
+0.2.0 的类文件约束、静态依赖和类型分支检查通过，被测源码与 `p2` 的源码树一致。diamond A/B 接入提交的核验情况见前文。
 
 ## Phase 1 历史设计
 
@@ -372,12 +414,12 @@ src/
   cli/
     Repl.ts                       # 读行、提示符、错误输出、退出生命周期
     Tokenizer.ts                  # 空白、双引号、空参数、整行注释
-    CommandRegistry.ts            # 命令名分派、参数语法、用例调用及反馈
+    CommandRegistry.ts            # 命令分发、参数检查、调用会话方法及输出结果
   application/
     EditorSession.ts              # 当前文档、文件路径、编辑入口与历史配对
     CommandBus.ts                 # EditCommand、undo/redo 栈及 IO 锁
     ShapeFactory.ts               # 唯一图形类型分派点，CLI/导入共用构造规则
-    DocumentStore.ts              # 文档存储端口及读入结果接口
+    DocumentStore.ts              # 文档存储接口及读入结果
     arguments.ts                  # CLI 与工厂共享的参数检查
     commands/
       CreateCommand.ts            # 创建及撤销
@@ -385,7 +427,7 @@ src/
       MoveCommand.ts              # 叶子或整组平移
       ScaleCommand.ts             # 叶子或整组缩放
       SetAttributeCommand.ts      # 白名单属性编辑
-      GroupCommand.ts             # 收编现有节点，恢复所有原位置
+      GroupCommand.ts             # 将现有节点移入新组，撤销时恢复原位置
       UngroupCommand.ts           # 解组，恢复组及继承样式
       AddToCommand.ts             # 迁移到指定组
       ReorderCommand.ts           # 同级置顶和置底
@@ -417,7 +459,7 @@ examples/
   flowchart.svg                   # 编译后 CLI 生成的结果
 ```
 
-`SvgDocument` 负责文档结构、唯一 ID 和画布信息，图形类维护各自私有几何状态。查找采用树遍历。`EditorSession` 把当前文档与对应 `CommandBus` 配对保存，外部调用具体用例。`ShapeFactory` 同时服务文本命令与 XML 导入。
+`SvgDocument` 负责文档结构、唯一 ID 和画布信息，图形类维护各自私有几何状态。查找采用树遍历。`EditorSession` 保存当前文档及其 `CommandBus`，其他模块通过会话提供的方法执行编辑。`ShapeFactory` 同时服务文本命令与 XML 导入。
 
 ```plantuml
 @startuml
@@ -443,15 +485,15 @@ infrastructure --> domain
 @enduml
 ```
 
-#### 设计模式的选择与落地
+#### 设计模式及实现
 
 | 模式或设计手法 | 实现位置与作用 | 取舍 |
 |---|---|---|
 | Command（命令模式） | 九个编辑命令实现 `EditCommand`，`CommandBus` 管理执行、撤销和重做 | 查询和文件操作不包装成可撤销命令 |
 | Composite（组合模式） | 六种图形实现 `Shape`，组持有同接口的子节点并递归准备移动、缩放 | 命令不按图形标签分支；组样式按 SVG 规则继承 |
 | 简单工厂 / 注册表 | `ShapeFactory` 集中类型构造，`CommandRegistry` 集中命令分派 | Phase 1 使用两个静态 Map；这两处名称分派是后续插件化的待重构点 |
-| Facade（外观模式） | `EditorSession` 隐藏文档选择、命令构造、历史和文件路径 | 通用执行方法私有，调用者使用明确的用例方法 |
-| Adapter（适配器）及依赖倒置 | `DocumentStore` 定义应用需要的能力，`SvgFileStore` 对接文件系统，`SvgCodec` 对接 XML | Node 文件 API 和第三方库仅位于外层 |
+| Facade（外观模式） | `EditorSession` 管理文档、命令构造、历史和文件路径 | 通用执行方法私有，对外提供创建、移动、保存等方法 |
+| Adapter（适配器）及依赖倒置 | `DocumentStore` 定义文件读写接口，`SvgFileStore` 对接文件系统，`SvgCodec` 对接 XML | Node 文件 API 和第三方库仅位于外层 |
 | 局部恢复记录 | `GeometryChange` 保存变更前后值，`ShapeLocation` 保存原对象、父容器及下标 | 使用闭包和小接口，不增加独立 Memento 类层次或通用事务框架 |
 
 `StyledShape` 共享所有图形实际需要的 ID、样式和恢复行为；各子类仍负责几何属性白名单、尺寸及坐标约束。基类不认识具体图形标签。命令名只在 `CommandRegistry`，图形类型名只在 `ShapeFactory`。序列化通过图形的类型、属性和子节点接口工作；展示对文本位置和端点属性做排版。
@@ -461,10 +503,10 @@ infrastructure --> domain
 | 模块 | 允许依赖 | 原因 |
 |---|---|---|
 | domain | domain | 领域规则可独立于终端、存储、XML 库运行 |
-| application | application、domain | 组织用例、历史及存储端口，不选择外部实现 |
+| application | application、domain | 组织编辑操作、管理历史，通过接口访问存储 |
 | presentation | presentation、domain | 查询模型并生成展示文本 |
 | cli | cli、application、presentation、Node 终端 API | 负责输入和反馈，不直接构造具体图形或读取文件 |
-| infrastructure | infrastructure、application、domain、外部 IO/XML 库 | 实现应用端口，复用工厂和领域校验 |
+| infrastructure | infrastructure、application、domain、外部 IO/XML 库 | 实现存储接口，复用工厂和领域校验 |
 | main | 所有需要装配的外层模块 | 唯一组合入口，显式注入真实文件适配器 |
 
 `arguments.ts` 的自由函数仅校验输入个数和数字，不承载领域行为。`test/architecture/Dependencies.test.ts` 自动检查上述静态 import 规则。
@@ -477,7 +519,7 @@ infrastructure --> domain
 
 `set` 恢复单个属性的旧值或原先未设置的状态。这样解组时可以同时准备多个继承属性，提交时不会相互覆盖。几何尺寸要求正数，坐标要求有限数，`stroke-width` 允许零。
 
-`group` 先验证所有目标、ID 和祖先关系，再按原文档深度优先顺序收编。在最近公共父容器中，放到第一个相关分支的位置；同父容器时对应第一个被选节点的位置。这补充了实验未规定的跨父容器插入规则。撤销按原顺序恢复所有父容器和下标，保留对象身份。
+`group` 先验证所有目标、ID 和祖先关系，再按原文档的深度优先遍历顺序将节点移入新组。新组位于最近公共父容器中第一个相关分支的位置；目标原属同一父容器时，新组占据第一个被选节点的位置。撤销会恢复各节点原来的父容器和顺序，并保留原对象。
 
 `ungroup` 拒绝顶层容器，将嵌套组的子节点提升到组原来的位置。组上未被子节点覆盖的显式样式会下放，避免外观变化；撤销会恢复原组及样式的显式/未设置状态。空组也可解散和恢复。
 
@@ -485,7 +527,7 @@ infrastructure --> domain
 
 #### 文件与会话生命周期
 
-`DocumentStore` 使用同步接口。当前是单用户 CLI，已有 REPL 按行同步调用；同步文件操作能保持回放的严格顺序，避免保存未完成时执行下一条编辑。大型文件会阻塞终端，若未来加入服务器或 GUI，再将端口改成异步并加入顺序调度；当前没有后台任务或并发写入。
+`DocumentStore` 使用同步接口。当前是单用户 CLI，REPL 按行同步调用；文件操作完成后才会执行下一条命令。大型文件会阻塞终端，若未来加入服务器或 GUI，再将接口改成异步，并明确命令执行顺序。
 
 `read` 完成 XML 解析、ID 分配和整个领域树校验后，才替换当前文档、历史和默认路径。显式 ID 先全量预留，自动分配不会抢占文件后面已有的 ID。警告只在成功读入后输出。
 
@@ -498,7 +540,7 @@ XML 采用 [`@xmldom/xmldom`](https://github.com/xmldom/xmldom) 的 DOMParser/XM
 #### 变化点假设
 
 1. **新增图形：** 增加封装几何规则的类并注册到工厂；命令继续调用 `Shape`。容器当前基于 `GroupShape`，未来第三方容器出现时再提取容器能力接口。
-2. **新增命令或入口：** CLI 扩展注册表；其他入口复用会话用例。当前创建接口接收文本参数，GUI 出现后再提供类型化创建请求。
+2. **新增命令或入口：** 在 CLI 注册表中加入命令；其他入口复用会话方法。当前创建接口接收文本参数，加入 GUI 后再提供带类型的创建参数。
 3. **更完整 SVG：** 主要扩展 codec 与模型的表达范围，特别是 transform、字体和 CSS；不能通过简单忽略属性声称支持。
 4. **其他存储：** 实现 `DocumentStore` 并在 main 注入，不改变编辑命令。
 5. **更大文档：** 当前树遍历与局部恢复记录足够；有性能证据后再增加索引、迭代遍历或历史容量限制。
@@ -517,7 +559,7 @@ XML 采用 [`@xmldom/xmldom`](https://github.com/xmldom/xmldom) 的 DOMParser/XM
 - 补齐 circle/ellipse/line/text、公共样式、scale/set 和撤销。发现文本内容可以恰好为 `in`，移除把所有末尾 `in` 都判为残缺子句的检查，交给具体创建语法校验。
 - 实现跨容器分组与解组，固定顺序、最近公共父容器和恢复位置的语义。
 - 解组复查发现：若多个属性变更都恢复整份样式快照，后应用的变更会覆盖前一个。改为单属性恢复，并补充同时继承 fill/stroke/stroke-width 的回归测试。
-- 实现存储端口、SVG codec、真实文件适配器、read/save/help。外部 SVG 读入先验证整个新文档，保存采用临时文件替换。
+- 实现存储接口、SVG codec、文件适配器和 read/save/help。外部 SVG 读入先验证整个新文档，保存采用临时文件替换。
 - 真实 CLI 实验回放的测试在临时目录启动时无法按裸包名找到 tsx。测试启动器改为解析 loader 的绝对 URL，验证从任意工作目录启动程序的场景。
 - 补齐文本与连线的树形展示、可回放示例、依赖方向测试和最终文档。
 
@@ -537,7 +579,7 @@ Phase 1 最终目录与当时方案一致。会话和命令总线承担了早期
 | 文件格式 | 命名空间、缺失/重复 ID、实体转义、CDATA、viewBox、非法 XML 拒绝 |
 | 示例 | 编译产物回放两节点流程图，生成 8 个元素的 SVG |
 
-明确保留的边界：
+当前限制：
 
 - `requireDocument()` 返回原文档，`GroupShape.add/remove` 公开，类型系统未禁止绕过会话编辑或跨文档共享对象。
 - 准备变更要求同步提交，历史按逆序撤销，不支持跨任意编辑延迟提交。

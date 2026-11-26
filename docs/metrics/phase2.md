@@ -2,10 +2,10 @@
 
 本报告由 `pnpm metrics` 生成，比较 Git 引用 `final` 与 `p2`。CLI 统计范围为 `src/**/*.ts`；VS Code 扩展、测试、依赖和构建产物不计入 CLI 重构数据。
 
-版本以源码目录的 Git 树哈希标识；仅修改文档或包版本号不会改变这些快照。发布前可运行 `pnpm metrics HEAD` 生成待标记为 `p2` 的源码指标，标签更新后运行 `pnpm metrics` 应得到相同报告。
+版本以源码目录的 Git 树哈希标识；仅修改文档或包版本号不会改变这些快照。可运行 `pnpm metrics HEAD` 生成当前提交的源码指标，再用 `pnpm metrics` 核验 p2 指向的源码是否生成相同报告。
 
 - final CLI 源码树（`src`）: `90ff6767c162e9645ed3d7948af28b4deae56fe6`
-- p2 CLI 源码树（`src`）: `1995f3611b27f1a45de34761f931713c931f72cf`
+- p2 CLI 源码树（`src`）: `aead12c3c5f9d42cda29be4bc5146618c05991b5`
 - final VS Code 源码树（`vscode-extension/src`）: 无
 - p2 VS Code 源码树（`vscode-extension/src`）: `1c460f0f3299d7a92b7915e7cef0a187b75b41c2`
 - 行数：文件中的物理行数，排除末尾换行产生的空项。
@@ -17,9 +17,9 @@
 
 | 分类 | final 文件 | p2 文件 | final 行数 | p2 行数 | 行数变化 | final 圈复杂度 | p2 圈复杂度 | 复杂度变化 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| kernel | 29 | 39 | 2357 | 2812 | 455 | 577 | 680 | 103 |
-| assembly | 1 | 3 | 11 | 256 | 245 | 1 | 90 | 89 |
-| plugins | 0 | 20 | 0 | 756 | 756 | 0 | 193 | 193 |
+| kernel | 29 | 38 | 2357 | 2739 | 382 | 577 | 656 | 79 |
+| assembly | 1 | 3 | 11 | 261 | 250 | 1 | 91 | 90 |
+| plugins | 0 | 22 | 0 | 863 | 863 | 0 | 220 | 220 |
 
 ## 函数复杂度分布
 
@@ -31,10 +31,10 @@
 | final | assembly | 0 | 0.00 | 0 | 0 | 0 | 0 |
 | final | plugins | 0 | 0.00 | 0 | 0 | 0 | 0 |
 | final | **全部** | 266 | 2.06 | 15 | 1 | 0 | 0 |
-| p2 | kernel | 315 | 2.03 | 15 | 1 | 0 | 0 |
-| p2 | assembly | 17 | 4.59 | 15 | 2 | 0 | 0 |
-| p2 | plugins | 88 | 1.97 | 14 | 2 | 0 | 0 |
-| p2 | **全部** | 420 | 2.12 | 15 | 5 | 0 | 0 |
+| p2 | kernel | 312 | 1.98 | 15 | 1 | 0 | 0 |
+| p2 | assembly | 15 | 5.13 | 16 | 1 | 0 | 0 |
+| p2 | plugins | 101 | 1.96 | 14 | 2 | 0 | 0 |
+| p2 | **全部** | 428 | 2.09 | 16 | 4 | 0 | 0 |
 
 ## 文件职责与复杂度
 
@@ -82,7 +82,7 @@
 | `src/application/DirectoryReadError.ts` | kernel | 6 | 2 | 1 | 1 | 0 | DirectoryReadError |
 | `src/application/DirectoryReader.ts` | kernel | 12 | 1 | 0 | 0 | 0 | DirectoryEntryKind, DirectoryEntry, DirectoryReader |
 | `src/application/DocumentStore.ts` | kernel | 12 | 1 | 0 | 0 | 0 | LoadedDocument, DocumentStore |
-| `src/application/EditorSession.ts` | kernel | 189 | 36 | 27 | 4 | 0 | ActiveDocument, EditorSession |
+| `src/application/EditorSession.ts` | kernel | 209 | 41 | 30 | 4 | 0 | ActiveDocument, EditorSession |
 | `src/application/ShapeFactory.ts` | kernel | 39 | 17 | 8 | 4 | 0 | ShapeFactory |
 | `src/application/arguments.ts` | kernel | 31 | 7 | 2 | 4 | 0 | expectCount, numberAt |
 | `src/application/commands/AddToCommand.ts` | kernel | 39 | 6 | 3 | 2 | 0 | AddToCommand |
@@ -97,38 +97,39 @@
 | `src/application/extensions/DuplicateRegistrationError.ts` | kernel | 7 | 2 | 1 | 1 | 0 | DuplicateRegistrationError |
 | `src/application/extensions/ExtensionRegistry.ts` | kernel | 115 | 35 | 14 | 6 | 0 | Category, ContributionMap, categories, ExtensionRegistry |
 | `src/application/extensions/PluginContracts.ts` | kernel | 85 | 1 | 0 | 0 | 0 | CommandResult, SvgElementData, ShapeProvider, PluginCommandContext |
-| `src/application/extensions/StagingContext.ts` | kernel | 32 | 8 | 5 | 3 | 0 | StagingContext |
+| `src/application/extensions/StagingContext.ts` | kernel | 43 | 13 | 10 | 3 | 0 | StagingContext |
 | `src/assembly/CliHost.ts` | assembly | 18 | 2 | 1 | 1 | 0 | createCliHost |
-| `src/assembly/PluginLoader.ts` | assembly | 199 | 76 | 14 | 15 | 2 | PluginConfigEntry, PluginConfig, PluginLoader, resolvePluginModule |
-| `src/cli/CommandRegistry.ts` | kernel | 323 | 70 | 47 | 10 | 0 | CommandHandler, CommandRegistry |
+| `src/assembly/PluginLoader.ts` | assembly | 200 | 77 | 14 | 16 | 1 | PluginConfigEntry, PluginConfig, PluginLoader, resolvePluginModule |
+| `src/cli/CommandRegistry.ts` | kernel | 331 | 73 | 48 | 10 | 0 | CommandHandler, CommandRegistry |
 | `src/cli/Repl.ts` | kernel | 58 | 11 | 5 | 5 | 0 | Repl |
 | `src/cli/Tokenizer.ts` | kernel | 45 | 11 | 1 | 10 | 0 | Tokenizer |
 | `src/domain/TreeDecorator.ts` | kernel | 17 | 1 | 0 | 0 | 0 | TreeDecorationTarget, TreeDecorator |
 | `src/domain/document/SvgDocument.ts` | kernel | 414 | 109 | 44 | 8 | 0 | ShapeLocation, SvgDocument |
 | `src/domain/shape/CircleShape.ts` | kernel | 46 | 11 | 8 | 2 | 0 | CircleGeometry, CircleShape |
-| `src/domain/shape/DiamondShape.ts` | kernel | 77 | 16 | 11 | 3 | 0 | DiamondGeometry, DiamondShape |
 | `src/domain/shape/EllipseShape.ts` | kernel | 47 | 11 | 8 | 2 | 0 | EllipseGeometry, EllipseShape |
 | `src/domain/shape/GroupShape.ts` | kernel | 119 | 33 | 18 | 7 | 0 | GroupShape |
 | `src/domain/shape/LineShape.ts` | kernel | 50 | 11 | 8 | 2 | 0 | LineGeometry, LineShape |
-| `src/domain/shape/RectShape.ts` | kernel | 161 | 42 | 13 | 10 | 0 | RectShape |
+| `src/domain/shape/RectShape.ts` | kernel | 122 | 20 | 11 | 8 | 0 | RectShape |
 | `src/domain/shape/Shape.ts` | kernel | 61 | 5 | 1 | 4 | 0 | ShapeAttributes, ShapeSummary, GeometryChange, Shape |
-| `src/domain/shape/StyledShape.ts` | kernel | 75 | 30 | 15 | 5 | 0 | StyledShape |
+| `src/domain/shape/StyledShape.ts` | kernel | 79 | 31 | 16 | 5 | 0 | StyledShape |
 | `src/domain/shape/TextShape.ts` | kernel | 49 | 13 | 9 | 4 | 0 | TextPosition, TextShape |
 | `src/infrastructure/NodeDirectoryReader.ts` | kernel | 27 | 9 | 4 | 3 | 0 | NodeDirectoryReader |
 | `src/infrastructure/SvgCodec.ts` | kernel | 156 | 69 | 15 | 15 | 1 | svgNamespace, xmlnsNamespace, SvgCodec |
 | `src/infrastructure/SvgFileStore.ts` | kernel | 44 | 12 | 3 | 6 | 0 | SvgFileStore |
-| `src/main.ts` | assembly | 39 | 12 | 2 | 1 | 0 | extensions, loader, baseFailure, startupArguments |
+| `src/main.ts` | assembly | 43 | 12 | 0 | 0 | 0 | extensions, loader, baseFailure, startupArguments |
 | `src/plugins/box/BoxAttributeHandler.ts` | plugins | 18 | 7 | 2 | 3 | 0 | BoxAttributeHandler |
 | `src/plugins/box/BoxPlugin.ts` | plugins | 25 | 2 | 1 | 1 | 0 | BoxPlugin, boxPlugin |
 | `src/plugins/box/BoxShape.ts` | plugins | 46 | 18 | 6 | 9 | 0 | BoxShape |
 | `src/plugins/box/BoxShapeProvider.ts` | plugins | 63 | 19 | 7 | 9 | 0 | BoxShapeProvider |
 | `src/plugins/box/BoxTypeDecorator.ts` | plugins | 10 | 3 | 1 | 2 | 0 | BoxTypeDecorator |
+| `src/plugins/diamond/DiamondPlugin.ts` | plugins | 15 | 2 | 1 | 1 | 0 | DiamondPlugin |
+| `src/plugins/diamond/DiamondShape.ts` | plugins | 77 | 16 | 11 | 3 | 0 | DiamondGeometry, DiamondShape |
+| `src/plugins/diamond/DiamondShapeProvider.ts` | plugins | 124 | 45 | 19 | 14 | 1 | DiamondShapeProvider |
 | `src/plugins/dir/DirCommand.ts` | plugins | 35 | 11 | 3 | 5 | 0 | DirCommand |
 | `src/plugins/dir/DirPlugin.ts` | plugins | 14 | 2 | 1 | 1 | 0 | DirPlugin, dirPlugin |
 | `src/plugins/shapes/BuiltinShapeProvider.ts` | plugins | 79 | 28 | 13 | 12 | 1 | BuiltinShapeProvider |
-| `src/plugins/shapes/BuiltinShapesPlugin.ts` | plugins | 33 | 3 | 1 | 2 | 0 | BuiltinShapesPlugin, builtinShapesPlugin |
+| `src/plugins/shapes/BuiltinShapesPlugin.ts` | plugins | 31 | 3 | 1 | 2 | 0 | BuiltinShapesPlugin, builtinShapesPlugin |
 | `src/plugins/shapes/CircleShapeProvider.ts` | plugins | 35 | 5 | 3 | 2 | 0 | CircleShapeProvider |
-| `src/plugins/shapes/DiamondShapeProvider.ts` | plugins | 107 | 36 | 18 | 14 | 1 | DiamondShapeProvider |
 | `src/plugins/shapes/EllipseShapeProvider.ts` | plugins | 37 | 5 | 3 | 2 | 0 | EllipseShapeProvider |
 | `src/plugins/shapes/GroupShapeProvider.ts` | plugins | 23 | 4 | 3 | 1 | 0 | GroupShapeProvider |
 | `src/plugins/shapes/LineShapeProvider.ts` | plugins | 37 | 5 | 3 | 2 | 0 | LineShapeProvider |
@@ -410,30 +411,29 @@
 | final | `src/presentation/Formatters.ts` | `label` | 83 | 1 |
 | final | `src/presentation/Formatters.ts` | `attributePairs` | 87 | 1 |
 | final | `src/presentation/Formatters.ts` | `<anonymous callback>` | 93 | 1 |
-| p2 | `src/assembly/PluginLoader.ts` | `packageManifest` | 162 | 15 |
+| p2 | `src/assembly/PluginLoader.ts` | `packageManifest` | 161 | 16 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `decode` | 14 | 15 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `geometryFromPoints` | 70 | 14 |
-| p2 | `src/assembly/PluginLoader.ts` | `loadConfig` | 28 | 12 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `geometryFromPoints` | 87 | 14 |
 | p2 | `src/plugins/shapes/BuiltinShapeProvider.ts` | `read` | 19 | 12 |
-| p2 | `src/assembly/PluginLoader.ts` | `inspectDefaultExport` | 142 | 10 |
-| p2 | `src/cli/CommandRegistry.ts` | `create` | 110 | 10 |
+| p2 | `src/assembly/PluginLoader.ts` | `loadConfig` | 38 | 10 |
+| p2 | `src/assembly/PluginLoader.ts` | `inspectDefaultExport` | 141 | 10 |
+| p2 | `src/cli/CommandRegistry.ts` | `create` | 118 | 10 |
 | p2 | `src/cli/Tokenizer.ts` | `tokenize` | 2 | 10 |
-| p2 | `src/domain/shape/RectShape.ts` | `constructor` | 10 | 10 |
-| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 119 | 9 |
-| p2 | `src/domain/shape/RectShape.ts` | `prepareScale` | 74 | 9 |
+| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 118 | 9 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `append (callback)` | 73 | 9 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `assertDocumentNodes` | 129 | 9 |
 | p2 | `src/plugins/box/BoxShape.ts` | `constructor` | 11 | 9 |
 | p2 | `src/plugins/box/BoxShapeProvider.ts` | `read` | 34 | 9 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `read` | 20 | 9 |
 | p2 | `src/domain/document/SvgDocument.ts` | `moveTo` | 193 | 8 |
 | p2 | `src/domain/document/SvgDocument.ts` | `prepareGroup` | 258 | 8 |
-| p2 | `src/domain/shape/RectShape.ts` | `prepareSet` | 120 | 8 |
-| p2 | `src/assembly/PluginLoader.ts` | `validContributions` | 186 | 7 |
+| p2 | `src/domain/shape/RectShape.ts` | `prepareSet` | 90 | 8 |
+| p2 | `src/assembly/PluginLoader.ts` | `validContributions` | 187 | 7 |
 | p2 | `src/domain/document/SvgDocument.ts` | `add` | 130 | 7 |
 | p2 | `src/domain/document/SvgDocument.ts` | `visit (callback)` | 265 | 7 |
 | p2 | `src/domain/shape/GroupShape.ts` | `add` | 27 | 7 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `findCommittedDuplicate` | 83 | 6 |
-| p2 | `src/assembly/PluginLoader.ts` | `resolvePluginModule` | 101 | 6 |
+| p2 | `src/assembly/PluginLoader.ts` | `resolvePluginModule` | 100 | 6 |
 | p2 | `src/infrastructure/SvgFileStore.ts` | `write` | 21 | 6 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `install` | 28 | 5 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `findManifestMismatch` | 67 | 5 |
@@ -442,7 +442,6 @@
 | p2 | `src/domain/document/SvgDocument.ts` | `constructor` | 18 | 5 |
 | p2 | `src/domain/document/SvgDocument.ts` | `search (callback)` | 351 | 5 |
 | p2 | `src/domain/document/SvgDocument.ts` | `validateDimensions` | 405 | 5 |
-| p2 | `src/domain/shape/RectShape.ts` | `prepareMove` | 100 | 5 |
 | p2 | `src/domain/shape/StyledShape.ts` | `prepareSet` | 29 | 5 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `readShape (callback)` | 43 | 5 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `directText` | 120 | 5 |
@@ -450,12 +449,14 @@
 | p2 | `src/presentation/Formatters.ts` | `tree` | 12 | 5 |
 | p2 | `src/application/arguments.ts` | `numberAt` | 13 | 4 |
 | p2 | `src/application/commands/SetAttributeCommand.ts` | `execute` | 22 | 4 |
-| p2 | `src/application/EditorSession.ts` | `save` | 71 | 4 |
+| p2 | `src/application/EditorSession.ts` | `save` | 83 | 4 |
+| p2 | `src/application/EditorSession.ts` | `markDecoratorsSaved` | 186 | 4 |
 | p2 | `src/application/ShapeFactory.ts` | `create` | 10 | 4 |
 | p2 | `src/application/ShapeFactory.ts` | `fromElement` | 20 | 4 |
-| p2 | `src/assembly/PluginLoader.ts` | `formatFailure` | 89 | 4 |
-| p2 | `src/assembly/PluginLoader.ts` | `parseConfig` | 115 | 4 |
-| p2 | `src/cli/CommandRegistry.ts` | `execute` | 58 | 4 |
+| p2 | `src/assembly/PluginLoader.ts` | `install` | 22 | 4 |
+| p2 | `src/assembly/PluginLoader.ts` | `formatFailure` | 88 | 4 |
+| p2 | `src/assembly/PluginLoader.ts` | `parseConfig` | 114 | 4 |
+| p2 | `src/cli/CommandRegistry.ts` | `dispatch` | 66 | 4 |
 | p2 | `src/domain/document/SvgDocument.ts` | `search (callback)` | 66 | 4 |
 | p2 | `src/domain/shape/Shape.ts` | `isContainerShape` | 55 | 4 |
 | p2 | `src/domain/shape/TextShape.ts` | `prepareSet` | 37 | 4 |
@@ -476,11 +477,12 @@
 | p2 | `src/application/commands/ScaleCommand.ts` | `undo` | 18 | 3 |
 | p2 | `src/application/commands/SetAttributeCommand.ts` | `undo` | 39 | 3 |
 | p2 | `src/application/commands/UngroupCommand.ts` | `undo` | 17 | 3 |
-| p2 | `src/application/EditorSession.ts` | `prepareAttributeChange` | 179 | 3 |
-| p2 | `src/application/extensions/StagingContext.ts` | `register` | 26 | 3 |
-| p2 | `src/cli/CommandRegistry.ts` | `init` | 74 | 3 |
-| p2 | `src/cli/CommandRegistry.ts` | `addTo` | 210 | 3 |
-| p2 | `src/cli/CommandRegistry.ts` | `singleId` | 307 | 3 |
+| p2 | `src/application/EditorSession.ts` | `prepareAttributeChange` | 199 | 3 |
+| p2 | `src/application/extensions/StagingContext.ts` | `register` | 37 | 3 |
+| p2 | `src/cli/CommandRegistry.ts` | `execute` | 58 | 3 |
+| p2 | `src/cli/CommandRegistry.ts` | `init` | 82 | 3 |
+| p2 | `src/cli/CommandRegistry.ts` | `addTo` | 218 | 3 |
+| p2 | `src/cli/CommandRegistry.ts` | `singleId` | 315 | 3 |
 | p2 | `src/domain/document/SvgDocument.ts` | `requireModifiable` | 97 | 3 |
 | p2 | `src/domain/document/SvgDocument.ts` | `requireContainer` | 112 | 3 |
 | p2 | `src/domain/document/SvgDocument.ts` | `remove` | 165 | 3 |
@@ -489,13 +491,12 @@
 | p2 | `src/domain/document/SvgDocument.ts` | `<anonymous callback>` | 327 | 3 |
 | p2 | `src/domain/document/SvgDocument.ts` | `<anonymous callback>` | 335 | 3 |
 | p2 | `src/domain/document/SvgDocument.ts` | `visit (callback)` | 385 | 3 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `validate` | 64 | 3 |
 | p2 | `src/domain/shape/GroupShape.ts` | `prepareMove` | 75 | 3 |
 | p2 | `src/domain/shape/GroupShape.ts` | `prepareScale` | 86 | 3 |
 | p2 | `src/domain/shape/StyledShape.ts` | `constructor` | 8 | 3 |
 | p2 | `src/domain/shape/StyledShape.ts` | `number` | 50 | 3 |
-| p2 | `src/domain/shape/StyledShape.ts` | `positive` | 64 | 3 |
-| p2 | `src/domain/shape/StyledShape.ts` | `factor` | 70 | 3 |
+| p2 | `src/domain/shape/StyledShape.ts` | `positive` | 68 | 3 |
+| p2 | `src/domain/shape/StyledShape.ts` | `factor` | 74 | 3 |
 | p2 | `src/infrastructure/NodeDirectoryReader.ts` | `<anonymous callback>` | 19 | 3 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `encode` | 67 | 3 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `length` | 143 | 3 |
@@ -503,7 +504,8 @@
 | p2 | `src/plugins/box/BoxAttributeHandler.ts` | `prepare` | 12 | 3 |
 | p2 | `src/plugins/box/BoxShape.ts` | `canModifyChild` | 37 | 3 |
 | p2 | `src/plugins/box/BoxShapeProvider.ts` | `write` | 57 | 3 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `parametersFromElement` | 53 | 3 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `validate` | 64 | 3 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `parametersFromElement` | 74 | 3 |
 | p2 | `src/plugins/stats/StatsCommand.ts` | `execute` | 10 | 3 |
 | p2 | `src/plugins/tree/ModifiedStarDecorator.ts` | `prepare` | 16 | 3 |
 | p2 | `src/plugins/tree/ModifiedStarDecorator.ts` | `<anonymous callback>` | 51 | 3 |
@@ -522,20 +524,18 @@
 | p2 | `src/application/commands/ReorderCommand.ts` | `undo` | 29 | 2 |
 | p2 | `src/application/commands/ScaleCommand.ts` | `execute` | 10 | 2 |
 | p2 | `src/application/commands/UngroupCommand.ts` | `execute` | 10 | 2 |
-| p2 | `src/application/EditorSession.ts` | `requireCurrent` | 158 | 2 |
-| p2 | `src/application/EditorSession.ts` | `requireStore` | 168 | 2 |
-| p2 | `src/application/EditorSession.ts` | `markDecoratorsSaved` | 174 | 2 |
+| p2 | `src/application/EditorSession.ts` | `requireCurrent` | 170 | 2 |
+| p2 | `src/application/EditorSession.ts` | `requireStore` | 180 | 2 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `commit` | 104 | 2 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `sameNames` | 109 | 2 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `errorMessage` | 113 | 2 |
 | p2 | `src/application/ShapeFactory.ts` | `<anonymous callback>` | 22 | 2 |
 | p2 | `src/application/ShapeFactory.ts` | `toElement` | 34 | 2 |
-| p2 | `src/assembly/PluginLoader.ts` | `install` | 22 | 2 |
-| p2 | `src/assembly/PluginLoader.ts` | `errorMessage` | 197 | 2 |
-| p2 | `src/cli/CommandRegistry.ts` | `canvas` | 92 | 2 |
-| p2 | `src/cli/CommandRegistry.ts` | `move` | 190 | 2 |
-| p2 | `src/cli/CommandRegistry.ts` | `group` | 238 | 2 |
-| p2 | `src/cli/CommandRegistry.ts` | `pluginContext` | 317 | 2 |
+| p2 | `src/assembly/PluginLoader.ts` | `errorMessage` | 198 | 2 |
+| p2 | `src/cli/CommandRegistry.ts` | `canvas` | 100 | 2 |
+| p2 | `src/cli/CommandRegistry.ts` | `move` | 198 | 2 |
+| p2 | `src/cli/CommandRegistry.ts` | `group` | 246 | 2 |
+| p2 | `src/cli/CommandRegistry.ts` | `pluginContext` | 325 | 2 |
 | p2 | `src/cli/Repl.ts` | `start` | 15 | 2 |
 | p2 | `src/domain/document/SvgDocument.ts` | `require` | 86 | 2 |
 | p2 | `src/domain/document/SvgDocument.ts` | `containsParent (callback)` | 207 | 2 |
@@ -546,8 +546,6 @@
 | p2 | `src/domain/document/SvgDocument.ts` | `validateNewSubtree` | 382 | 2 |
 | p2 | `src/domain/shape/CircleShape.ts` | `constructor` | 10 | 2 |
 | p2 | `src/domain/shape/CircleShape.ts` | `prepareSet` | 32 | 2 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `constructor` | 16 | 2 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `prepareSet` | 54 | 2 |
 | p2 | `src/domain/shape/EllipseShape.ts` | `constructor` | 10 | 2 |
 | p2 | `src/domain/shape/EllipseShape.ts` | `prepareSet` | 32 | 2 |
 | p2 | `src/domain/shape/GroupShape.ts` | `remove` | 57 | 2 |
@@ -556,8 +554,9 @@
 | p2 | `src/domain/shape/GroupShape.ts` | `containsShape` | 112 | 2 |
 | p2 | `src/domain/shape/LineShape.ts` | `constructor` | 10 | 2 |
 | p2 | `src/domain/shape/LineShape.ts` | `prepareSet` | 41 | 2 |
+| p2 | `src/domain/shape/RectShape.ts` | `constructor` | 10 | 2 |
 | p2 | `src/domain/shape/StyledShape.ts` | `<anonymous callback>` | 40 | 2 |
-| p2 | `src/domain/shape/StyledShape.ts` | `finite` | 58 | 2 |
+| p2 | `src/domain/shape/StyledShape.ts` | `finiteValues` | 62 | 2 |
 | p2 | `src/infrastructure/NodeDirectoryReader.ts` | `list` | 15 | 2 |
 | p2 | `src/infrastructure/NodeDirectoryReader.ts` | `<anonymous callback>` | 18 | 2 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `parseViewBox` | 137 | 2 |
@@ -565,13 +564,15 @@
 | p2 | `src/plugins/box/BoxShape.ts` | `remove` | 42 | 2 |
 | p2 | `src/plugins/box/BoxShapeProvider.ts` | `canRead` | 29 | 2 |
 | p2 | `src/plugins/box/BoxTypeDecorator.ts` | `decorate` | 7 | 2 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `constructor` | 16 | 2 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `prepareSet` | 54 | 2 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `write` | 53 | 2 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `closeTo (callback)` | 113 | 2 |
 | p2 | `src/plugins/shapes/BuiltinShapeProvider.ts` | `numberOrZero` | 64 | 2 |
 | p2 | `src/plugins/shapes/BuiltinShapeProvider.ts` | `requiredNumber` | 68 | 2 |
 | p2 | `src/plugins/shapes/BuiltinShapeProvider.ts` | `numericAttribute` | 72 | 2 |
-| p2 | `src/plugins/shapes/BuiltinShapesPlugin.ts` | `activate` | 17 | 2 |
+| p2 | `src/plugins/shapes/BuiltinShapesPlugin.ts` | `activate` | 16 | 2 |
 | p2 | `src/plugins/shapes/CircleShapeProvider.ts` | `parametersFromElement` | 22 | 2 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `write` | 32 | 2 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `closeTo (callback)` | 96 | 2 |
 | p2 | `src/plugins/shapes/EllipseShapeProvider.ts` | `parametersFromElement` | 23 | 2 |
 | p2 | `src/plugins/shapes/LineShapeProvider.ts` | `parametersFromElement` | 23 | 2 |
 | p2 | `src/plugins/shapes/RectShapeProvider.ts` | `parametersFromElement` | 23 | 2 |
@@ -594,28 +595,31 @@
 | p2 | `src/application/commands/SetAttributeCommand.ts` | `<anonymous callback>` | 18 | 1 |
 | p2 | `src/application/commands/UngroupCommand.ts` | `constructor` | 8 | 1 |
 | p2 | `src/application/DirectoryReadError.ts` | `constructor` | 3 | 1 |
-| p2 | `src/application/EditorSession.ts` | `constructor` | 28 | 1 |
-| p2 | `src/application/EditorSession.ts` | `init` | 35 | 1 |
-| p2 | `src/application/EditorSession.ts` | `requireDocument` | 46 | 1 |
-| p2 | `src/application/EditorSession.ts` | `getDocument` | 51 | 1 |
-| p2 | `src/application/EditorSession.ts` | `shapeCreationUsages` | 56 | 1 |
-| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 57 | 1 |
-| p2 | `src/application/EditorSession.ts` | `read` | 61 | 1 |
-| p2 | `src/application/EditorSession.ts` | `resizeCanvas` | 85 | 1 |
-| p2 | `src/application/EditorSession.ts` | `createShape` | 93 | 1 |
-| p2 | `src/application/EditorSession.ts` | `deleteShape` | 106 | 1 |
-| p2 | `src/application/EditorSession.ts` | `moveShape` | 111 | 1 |
-| p2 | `src/application/EditorSession.ts` | `scaleShape` | 115 | 1 |
-| p2 | `src/application/EditorSession.ts` | `setAttribute` | 119 | 1 |
-| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 121 | 1 |
-| p2 | `src/application/EditorSession.ts` | `groupShapes` | 124 | 1 |
-| p2 | `src/application/EditorSession.ts` | `ungroupShape` | 128 | 1 |
-| p2 | `src/application/EditorSession.ts` | `addTo` | 133 | 1 |
-| p2 | `src/application/EditorSession.ts` | `reorderShape` | 138 | 1 |
-| p2 | `src/application/EditorSession.ts` | `undo` | 143 | 1 |
-| p2 | `src/application/EditorSession.ts` | `redo` | 148 | 1 |
-| p2 | `src/application/EditorSession.ts` | `execute` | 153 | 1 |
-| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 180 | 1 |
+| p2 | `src/application/EditorSession.ts` | `constructor` | 31 | 1 |
+| p2 | `src/application/EditorSession.ts` | `init` | 38 | 1 |
+| p2 | `src/application/EditorSession.ts` | `requireDocument` | 49 | 1 |
+| p2 | `src/application/EditorSession.ts` | `getDocument` | 54 | 1 |
+| p2 | `src/application/EditorSession.ts` | `treeDecorators` | 58 | 1 |
+| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 59 | 1 |
+| p2 | `src/application/EditorSession.ts` | `takeWarnings` | 63 | 1 |
+| p2 | `src/application/EditorSession.ts` | `shapeCreationUsages` | 68 | 1 |
+| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 69 | 1 |
+| p2 | `src/application/EditorSession.ts` | `read` | 73 | 1 |
+| p2 | `src/application/EditorSession.ts` | `resizeCanvas` | 97 | 1 |
+| p2 | `src/application/EditorSession.ts` | `createShape` | 105 | 1 |
+| p2 | `src/application/EditorSession.ts` | `deleteShape` | 118 | 1 |
+| p2 | `src/application/EditorSession.ts` | `moveShape` | 123 | 1 |
+| p2 | `src/application/EditorSession.ts` | `scaleShape` | 127 | 1 |
+| p2 | `src/application/EditorSession.ts` | `setAttribute` | 131 | 1 |
+| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 133 | 1 |
+| p2 | `src/application/EditorSession.ts` | `groupShapes` | 136 | 1 |
+| p2 | `src/application/EditorSession.ts` | `ungroupShape` | 140 | 1 |
+| p2 | `src/application/EditorSession.ts` | `addTo` | 145 | 1 |
+| p2 | `src/application/EditorSession.ts` | `reorderShape` | 150 | 1 |
+| p2 | `src/application/EditorSession.ts` | `undo` | 155 | 1 |
+| p2 | `src/application/EditorSession.ts` | `redo` | 160 | 1 |
+| p2 | `src/application/EditorSession.ts` | `execute` | 165 | 1 |
+| p2 | `src/application/EditorSession.ts` | `<anonymous callback>` | 200 | 1 |
 | p2 | `src/application/extensions/DuplicateRegistrationError.ts` | `constructor` | 4 | 1 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `shapeProvider` | 60 | 1 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `shapeProviders` | 61 | 1 |
@@ -624,19 +628,24 @@
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `treeDecorators` | 64 | 1 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `attributeHandlers` | 65 | 1 |
 | p2 | `src/application/extensions/ExtensionRegistry.ts` | `<anonymous callback>` | 110 | 1 |
-| p2 | `src/application/extensions/StagingContext.ts` | `registerShapeProvider` | 10 | 1 |
-| p2 | `src/application/extensions/StagingContext.ts` | `registerCommand` | 14 | 1 |
-| p2 | `src/application/extensions/StagingContext.ts` | `registerTreeDecorator` | 18 | 1 |
-| p2 | `src/application/extensions/StagingContext.ts` | `registerAttributeHandler` | 22 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `shapeProviders` | 10 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `commandsList` | 11 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `treeDecorators` | 12 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `attributeHandlers` | 13 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `names` | 15 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `registerShapeProvider` | 21 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `registerCommand` | 25 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `registerTreeDecorator` | 29 | 1 |
+| p2 | `src/application/extensions/StagingContext.ts` | `registerAttributeHandler` | 33 | 1 |
 | p2 | `src/application/ShapeFactory.ts` | `constructor` | 7 | 1 |
 | p2 | `src/application/ShapeFactory.ts` | `<anonymous callback>` | 21 | 1 |
 | p2 | `src/application/ShapeFactory.ts` | `<anonymous callback>` | 24 | 1 |
 | p2 | `src/application/ShapeFactory.ts` | `<anonymous callback>` | 35 | 1 |
 | p2 | `src/assembly/CliHost.ts` | `createCliHost` | 12 | 1 |
 | p2 | `src/assembly/PluginLoader.ts` | `constructor` | 19 | 1 |
-| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 80 | 1 |
-| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 190 | 1 |
-| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 194 | 1 |
+| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 30 | 1 |
+| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 191 | 1 |
+| p2 | `src/assembly/PluginLoader.ts` | `<anonymous callback>` | 195 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `constructor` | 18 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 24 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 25 | 1 |
@@ -660,21 +669,21 @@
 | p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 51 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 52 | 1 |
 | p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 54 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `read` | 145 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `save` | 153 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `help` | 159 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 174 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 175 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `deleteShape` | 179 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `scale` | 229 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `ungroup` | 245 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `set` | 251 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `front` | 259 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `back` | 269 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `tree` | 279 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `show` | 290 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `exit` | 300 | 1 |
-| p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 319 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `read` | 153 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `save` | 161 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `help` | 167 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 182 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 183 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `deleteShape` | 187 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `scale` | 237 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `ungroup` | 253 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `set` | 259 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `front` | 267 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `back` | 277 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `tree` | 287 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `show` | 298 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `exit` | 308 | 1 |
+| p2 | `src/cli/CommandRegistry.ts` | `<anonymous callback>` | 327 | 1 |
 | p2 | `src/cli/Repl.ts` | `constructor` | 9 | 1 |
 | p2 | `src/cli/Repl.ts` | `onLine (callback)` | 22 | 1 |
 | p2 | `src/cli/Repl.ts` | `<anonymous callback>` | 28 | 1 |
@@ -705,14 +714,6 @@
 | p2 | `src/domain/shape/CircleShape.ts` | `prepare` | 37 | 1 |
 | p2 | `src/domain/shape/CircleShape.ts` | `<anonymous callback>` | 39 | 1 |
 | p2 | `src/domain/shape/CircleShape.ts` | `validate` | 42 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `center` | 23 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `width` | 27 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `height` | 31 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `attributes` | 35 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `prepareMove` | 39 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `prepareScale` | 48 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `prepare` | 59 | 1 |
-| p2 | `src/domain/shape/DiamondShape.ts` | `<anonymous callback>` | 61 | 1 |
 | p2 | `src/domain/shape/EllipseShape.ts` | `attributes` | 17 | 1 |
 | p2 | `src/domain/shape/EllipseShape.ts` | `prepareMove` | 21 | 1 |
 | p2 | `src/domain/shape/EllipseShape.ts` | `prepareScale` | 26 | 1 |
@@ -736,15 +737,15 @@
 | p2 | `src/domain/shape/LineShape.ts` | `prepareScale` | 35 | 1 |
 | p2 | `src/domain/shape/LineShape.ts` | `prepare` | 46 | 1 |
 | p2 | `src/domain/shape/LineShape.ts` | `<anonymous callback>` | 48 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `position` | 41 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `width` | 46 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `height` | 51 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `fill` | 56 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `attributes` | 61 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `children` | 116 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `geometryChange` | 135 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `<anonymous callback>` | 147 | 1 |
-| p2 | `src/domain/shape/RectShape.ts` | `<anonymous callback>` | 153 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `position` | 29 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `width` | 34 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `height` | 39 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `fill` | 44 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `attributes` | 49 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `prepareScale` | 62 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `prepareMove` | 79 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `geometryChange` | 105 | 1 |
+| p2 | `src/domain/shape/RectShape.ts` | `<anonymous callback>` | 114 | 1 |
 | p2 | `src/domain/shape/StyledShape.ts` | `attributes` | 14 | 1 |
 | p2 | `src/domain/shape/StyledShape.ts` | `children` | 18 | 1 |
 | p2 | `src/domain/shape/StyledShape.ts` | `treeSummary` | 22 | 1 |
@@ -753,6 +754,7 @@
 | p2 | `src/domain/shape/StyledShape.ts` | `change` | 46 | 1 |
 | p2 | `src/domain/shape/StyledShape.ts` | `<anonymous callback>` | 47 | 1 |
 | p2 | `src/domain/shape/StyledShape.ts` | `<anonymous callback>` | 47 | 1 |
+| p2 | `src/domain/shape/StyledShape.ts` | `finite` | 58 | 1 |
 | p2 | `src/domain/shape/TextShape.ts` | `constructor` | 10 | 1 |
 | p2 | `src/domain/shape/TextShape.ts` | `attributes` | 16 | 1 |
 | p2 | `src/domain/shape/TextShape.ts` | `treeSummary` | 20 | 1 |
@@ -766,8 +768,6 @@
 | p2 | `src/infrastructure/SvgCodec.ts` | `<anonymous callback>` | 16 | 1 |
 | p2 | `src/infrastructure/SvgCodec.ts` | `<anonymous callback>` | 140 | 1 |
 | p2 | `src/infrastructure/SvgFileStore.ts` | `constructor` | 9 | 1 |
-| p2 | `src/main.ts` | `<anonymous callback>` | 34 | 1 |
-| p2 | `src/main.ts` | `<anonymous callback>` | 35 | 1 |
 | p2 | `src/plugins/box/BoxPlugin.ts` | `activate` | 17 | 1 |
 | p2 | `src/plugins/box/BoxShape.ts` | `rectangle` | 31 | 1 |
 | p2 | `src/plugins/box/BoxShape.ts` | `label` | 32 | 1 |
@@ -776,6 +776,29 @@
 | p2 | `src/plugins/box/BoxShapeProvider.ts` | `<anonymous callback>` | 37 | 1 |
 | p2 | `src/plugins/box/BoxShapeProvider.ts` | `<anonymous callback>` | 38 | 1 |
 | p2 | `src/plugins/box/BoxShapeProvider.ts` | `canWrite` | 55 | 1 |
+| p2 | `src/plugins/diamond/DiamondPlugin.ts` | `activate` | 10 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `center` | 23 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `width` | 27 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `height` | 31 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `attributes` | 35 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `prepareMove` | 39 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `prepareScale` | 48 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `prepare` | 59 | 1 |
+| p2 | `src/plugins/diamond/DiamondShape.ts` | `<anonymous callback>` | 61 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `elementName` | 12 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `canRead` | 16 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `create` | 37 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `canWrite` | 49 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 60 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 61 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `points` | 81 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 89 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 95 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 99 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 100 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 115 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 116 | 1 |
+| p2 | `src/plugins/diamond/DiamondShapeProvider.ts` | `<anonymous callback>` | 117 | 1 |
 | p2 | `src/plugins/dir/DirCommand.ts` | `<anonymous callback>` | 32 | 1 |
 | p2 | `src/plugins/dir/DirPlugin.ts` | `activate` | 8 | 1 |
 | p2 | `src/plugins/shapes/BuiltinShapeProvider.ts` | `elementName` | 9 | 1 |
@@ -789,20 +812,6 @@
 | p2 | `src/plugins/shapes/BuiltinShapeProvider.ts` | `acceptsText` | 60 | 1 |
 | p2 | `src/plugins/shapes/CircleShapeProvider.ts` | `create` | 11 | 1 |
 | p2 | `src/plugins/shapes/CircleShapeProvider.ts` | `consumedAttributes` | 32 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `elementName` | 12 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `create` | 16 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `canWrite` | 28 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 39 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 40 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `consumedAttributes` | 60 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `points` | 64 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 72 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 78 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 82 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 83 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 98 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 99 | 1 |
-| p2 | `src/plugins/shapes/DiamondShapeProvider.ts` | `<anonymous callback>` | 100 | 1 |
 | p2 | `src/plugins/shapes/EllipseShapeProvider.ts` | `create` | 11 | 1 |
 | p2 | `src/plugins/shapes/EllipseShapeProvider.ts` | `consumedAttributes` | 34 | 1 |
 | p2 | `src/plugins/shapes/GroupShapeProvider.ts` | `create` | 11 | 1 |

@@ -1,6 +1,6 @@
 # SVG-Editor
 
-这是一个用 TypeScript 编写的命令行 SVG 编辑器，附带 VS Code 扩展。CLI 可以创建七种内置图形、编辑和分组、撤销和重做，以及读写 SVG 文件。插件提供带标题的矩形框、图形统计、目录列表和树形标签。
+这是一个用 TypeScript 编写的命令行 SVG 编辑器，附带 VS Code 扩展。CLI 可以创建六种基础图形、编辑和分组、撤销和重做，以及读写 SVG 文件。插件提供菱形、带标题的矩形框、图形统计、目录列表和树形标签。
 
 当前版本为 **0.2.0**，主程序与 VS Code 扩展使用相同版本号。`final` 标签保留 Phase 1 基线，`p2` 标签对应本次 Phase 2 交付。
 
@@ -22,7 +22,7 @@ pnpm start
 
 Windows PowerShell 中可以使用 `pnpm.cmd`。输入 `help` 查看命令及已加载图形的创建语法。输入 `exit`、`quit` 或 EOF 结束会话。
 
-启动时，CLI 优先使用 `--config` 指定的文件，其次检查当前工作目录的 `plugins.config.json`。未传 `--config` 且默认配置文件不存在时，依次加载 `stats`、`dir`、`modified-star` 和 `box`。七种内置图形始终可用。
+启动时，CLI 优先使用 `--config` 指定的文件，其次检查当前工作目录的 `plugins.config.json`。未传 `--config` 且默认配置文件不存在时，依次加载 `stats`、`dir`、`modified-star`、`box` 和 `diamond`。六种基础图形始终可用。配置为 `{"plugins":[]}` 时关闭所有可选插件，恢复 Phase 1 的帮助和图形类型范围。
 
 将下面的配置保存到仓库根目录的 `plugins.config.json`，再从仓库根目录运行：
 
@@ -82,7 +82,7 @@ cmd /c "node dist/main.js < examples\flowchart.txt"
 | 分类 | 命令 |
 |---|---|
 | 文档 | `init [w] [h]`、`read <file.svg>`、`save [file.svg]`、`canvas [w h]` |
-| 创建 | `create rect/circle/ellipse/line/text/g/diamond <id> ... [in <containerId>]`，加载 box 插件后也可用 `create box` |
+| 创建 | `create rect/circle/ellipse/line/text/g <id> ... [in <containerId>]`；加载对应插件后可用 `create box` 和 `create diamond` |
 | 编辑 | `delete <id>`、`move <id> <dx> <dy>`、`scale <id> <factor>`、`set <id> <attr> <value>` |
 | 结构 | `group <newGid> <id1> [id2...]`、`ungroup <gid>`、`addto <containerId> <id>`、`front <id>`、`back <id>` |
 | 查看 | `tree [id]`、`show <id>`、`help` |
@@ -116,7 +116,9 @@ box 的 `<id>-rect` 和 `<id>-label` 是必要部件，不能直接编辑或移�
 
 ## SVG 范围
 
-支持 SVG 命名空间中的 `rect`、`circle`、`ellipse`、`line`、`text` 和 `g`，以及菱形使用的 `<polygon data-shape="diamond">`。可读写几何和公共样式属性、纯文本或 CDATA、画布尺寸和 `viewBox`。缺少 ID 时按“标签名加序号”分配新 ID 并输出警告，新 ID 会避开整个文件中已有的 ID。数值支持小数和科学计数法，读入长度还支持 `px`。菱形的存储格式见 [diamond 说明](docs/phase2-diamond.md)。
+支持 SVG 命名空间中的 `rect`、`circle`、`ellipse`、`line`、`text` 和 `g`，启用 diamond 后还支持其使用的 `<polygon data-shape="diamond">`。可读写几何和公共样式属性、纯文本或 CDATA、画布尺寸和 `viewBox`。
+
+缺少 ID 时按“标签名加序号”分配新 ID 并输出警告，新 ID 会避开整个文件中已有的 ID。数值支持小数和科学计数法，读入长度还支持 `px`。菱形的存储格式见 [diamond 说明](doc/README.md#diamond-判断框)。
 
 `box` 插件把框保存为 `<g data-kind="box">`。关闭插件后，可以把该元素及其子节点读为普通组。读入 `path`、不符合菱形顶点约束的 `polygon`、CSS、`transform`、嵌套 `tspan`、外部资源和 DTD 时会报错并保留原文档。保存时先写临时文件，再替换目标文件。编码或写入失败时，编辑器保留原有路径和历史。
 
@@ -131,7 +133,9 @@ pnpm build:vscode
 code --new-window "--extensionDevelopmentPath=$PWD/vscode-extension" "$PWD"
 ```
 
-开发宿主启动后，可在命令面板运行 `Developer: Show Running Extensions` 确认扩展已加载。在 Explorer 中展开 `examples`，可以在 `flowchart.svg` 旁查看 `[]`。用 `Text Editor` 打开该文件，在 Outline 中展开元素并点击节点，就能跳到对应源码。界面示例见 [实验附图：文件标记](docs/images/vscode-svg-badge.jpg) 和 [实验附图：大纲定位](docs/images/vscode-svg-outline.jpg)。
+开发宿主启动后，可在命令面板运行 `Developer: Show Running Extensions` 确认扩展已加载。在 Explorer 中展开 `examples`，可以在 `flowchart.svg` 旁查看 `[]`。用 `Text Editor` 打开该文件，在 Outline 中展开元素并点击节点，就能跳到对应源码。
+
+运行效果见 [文件标记](docs/images/vscode-svg-badge.png) 和 [大纲定位](docs/images/vscode-svg-outline.png)。
 
 ## 验证与设计
 
@@ -143,6 +147,7 @@ pnpm test
 pnpm build
 pnpm build:vscode
 pnpm metrics
+node scripts/verify-diamond-evidence.mjs
 ```
 
 测试覆盖图形校验、撤销和重做、CLI 输入、命令失败后的状态、真实文件读写、插件加载、实验会话和模块依赖。设计和验收说明见 [架构文档](doc/README.md)。源码指标比较 `final` 与 `p2` 标签，并记录源码目录的 Git 树哈希，见 [指标报告](docs/metrics/phase2.md)。
