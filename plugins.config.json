@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    { "module": "./src/plugins/stats/StatsPlugin.ts" },
+    { "module": "./src/plugins/dir/DirPlugin.ts" },
+    { "module": "./src/plugins/tree/ModifiedStarPlugin.ts" },
+    { "module": "./src/plugins/box/BoxPlugin.ts" },
+    { "module": "./src/plugins/diamond/DiamondPlugin.ts" }
+  ]
+}
