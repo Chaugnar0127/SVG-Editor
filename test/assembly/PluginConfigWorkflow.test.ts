@@ -6,6 +6,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
+
 test("CLI config mode loads configured plugins and keeps default shapes available", (t) => {
   const directory = mkdtempSync(join(tmpdir(), "svg-editor-config-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -136,9 +138,11 @@ test("code and config assembly produce identical Phase 1, box, and command trans
     const codeWorkingDirectory = join(codeDirectory, scenario.name);
     const configCwd = join(configWorkingDirectory, scenario.name);
     const input = readFileSync(join(fixturesDirectory, "transcripts", `${scenario.name}.input.txt`), "utf8");
-    const expected = JSON.parse(
+    const historicalExpected = JSON.parse(
       readFileSync(join(fixturesDirectory, "expected", `${scenario.name}.stdout.json`), "utf8"),
     ) as string;
+    // Preserve historical command output while checking the current package version in the banner.
+    const expected = historicalExpected.replace(/^svg-editor [^\n]+\n/u, `svg-editor ${version}\n`);
     for (const directory of [codeWorkingDirectory, configCwd]) {
       mkdirSync(join(directory, "docs"), { recursive: true });
       for (const file of ["demo.svg", "other.svg"]) {

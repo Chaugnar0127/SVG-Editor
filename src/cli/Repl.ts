@@ -1,5 +1,6 @@
 import { createInterface, type Interface } from "node:readline";
 import { stdin, stdout } from "node:process";
+import { readFileSync } from "node:fs";
 import type { CommandRegistry } from "./CommandRegistry.js";
 import type { Tokenizer } from "./Tokenizer.js";
 
@@ -13,6 +14,7 @@ export class Repl {
 
   /** 创建读行接口，并在关闭时解除输入监听。 */
   public start(): void {
+    const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
     const terminal: Interface = createInterface({
       input: stdin,
       output: stdout,
@@ -29,7 +31,7 @@ export class Repl {
       terminal.off("line", onLine);
     });
 
-    stdout.write("svg-editor 0.1\n");
+    stdout.write(`svg-editor ${version}\n`);
     terminal.setPrompt(this.prompt);
     terminal.prompt();
   }

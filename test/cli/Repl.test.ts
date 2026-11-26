@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
+const banner = `svg-editor ${version}`;
 
 function runCli(input: string): string[] {
   const result = spawnSync(process.execPath, [
@@ -16,7 +20,7 @@ function runCli(input: string): string[] {
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "");
-  assert.ok(result.stdout.startsWith("svg-editor 0.1\nsvg> "));
+  assert.ok(result.stdout.startsWith(`${banner}\nsvg> `), "startup banner must match package.json version");
   assert.ok(!result.stdout.includes("\u001b"), "piped output should not contain terminal escapes");
   return result.stdout.replaceAll("svg> ", "").trim().split(/\r?\n/u);
 }
@@ -37,7 +41,7 @@ test("CLI moves a group atomically, shows current geometry and restores one-step
     "quit",
     "",
   ].join("\n")), [
-    "svg-editor 0.1",
+    banner,
     "canvas 800x600 created",
     "g#scene created",
     "rect#a created in g#scene",
@@ -76,7 +80,7 @@ test("CLI runs document commands and continues after lookup, arity, numeric and 
     "",
   ].join("\n"));
   assert.deepEqual(output, [
-    "svg-editor 0.1",
+    banner,
     "error: no document. use 'init' or 'read' first",
     "canvas 400x300 created",
     "canvas 400x300",
@@ -95,13 +99,13 @@ test("CLI runs document commands and continues after lookup, arity, numeric and 
 
 test("CLI handles EOF with a final unterminated line without requiring quit", () => {
   assert.deepEqual(runCli("init 200 100\ncanvas"), [
-    "svg-editor 0.1", "canvas 200x100 created", "canvas 200x100",
+    banner, "canvas 200x100 created", "canvas 200x100",
   ]);
 });
 
 test("CLI rejects exit arguments and continues accepting commands", () => {
   assert.deepEqual(runCli("exit extra\nquit extra\ninit\ncanvas\nquit\n"), [
-    "svg-editor 0.1",
+    banner,
     "error: usage: exit | quit",
     "error: usage: exit | quit",
     "canvas 800x600 created",
@@ -112,7 +116,7 @@ test("CLI rejects exit arguments and continues accepting commands", () => {
 for (const name of ["exit", "quit"]) {
   test(`CLI stops executing buffered input after ${name}`, () => {
     assert.deepEqual(runCli(`init 400 300\n${name}\ninit 900 700\ncanvas\n`), [
-      "svg-editor 0.1", "canvas 400x300 created",
+      banner, "canvas 400x300 created",
     ]);
   });
 }
@@ -134,7 +138,7 @@ test("CLI creates and deletes subtrees while preserving redo after a rejected cr
     "create g ignored",
     "",
   ].join("\n")), [
-    "svg-editor 0.1",
+    banner,
     "canvas 400x300 created",
     "g#scene created",
     "rect#r1 created in g#scene",
@@ -169,7 +173,7 @@ test("CLI recovers from creation syntax and domain errors with exactly one error
     "quit",
     "",
   ].join("\n")), [
-    "svg-editor 0.1",
+    banner,
     "error: no document. use 'init' or 'read' first",
     "error: no document. use 'init' or 'read' first",
     "canvas 800x600 created",
@@ -218,7 +222,7 @@ test("CLI composes sorting, migration and deletion, preserves redo after failure
     "front a",
     "",
   ].join("\n")), [
-    "svg-editor 0.1",
+    banner,
     "canvas 800x600 created",
     "g#scene created",
     "g#other created",
@@ -275,7 +279,7 @@ test("CLI displays multiline trees and current parents without consuming edit hi
     "tree",
     "",
   ].join("\n")), [
-    "svg-editor 0.1",
+    banner,
     "error: no document. use 'init' or 'read' first",
     "canvas 400x300 created",
     "svg (400x300)",
