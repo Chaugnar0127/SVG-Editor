@@ -25,15 +25,13 @@ if (invalidStartupArguments) {
   pluginErrors = await loader.loadConfig(configPath);
 } else {
   const defaults = [
-    "./plugins/stats/StatsPlugin.js",
-    "./plugins/dir/DirPlugin.js",
-    "./plugins/tree/ModifiedStarPlugin.js",
-    "./plugins/box/BoxPlugin.js",
-  ];
+    [(await import("./plugins/stats/StatsPlugin.js")).default, new URL("./plugins/stats/StatsPlugin.js", import.meta.url)],
+    [(await import("./plugins/dir/DirPlugin.js")).default, new URL("./plugins/dir/DirPlugin.js", import.meta.url)],
+    [(await import("./plugins/tree/ModifiedStarPlugin.js")).default, new URL("./plugins/tree/ModifiedStarPlugin.js", import.meta.url)],
+    [(await import("./plugins/box/BoxPlugin.js")).default, new URL("./plugins/box/BoxPlugin.js", import.meta.url)],
+  ] as const;
   const failures: string[] = [];
-  for (const module of defaults) {
-    const url = new URL(module, import.meta.url);
-    const plugin = (await import(url.href)).default;
+  for (const [plugin, url] of defaults) {
     const failure = loader.install(plugin, url);
     if (failure !== undefined) failures.push(failure);
   }

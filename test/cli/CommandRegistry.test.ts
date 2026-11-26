@@ -286,32 +286,6 @@ test("registry creates root and nested shapes, preserves quoted fill, and treats
   assert.deepEqual(document.topLevel(), [plain]);
 });
 
-test("create, move, scale, and set commands dispatch diamond behavior through its provider", () => {
-  const session = createTestSession();
-  const registry = new CommandRegistry(session);
-  const tokenizer = new Tokenizer();
-  const execute = (line: string) => registry.execute(tokenizer.tokenize(line));
-  execute("init");
-  assert.deepEqual(execute("create diamond decision 40 50 80 40 gold"), {
-    kind: "message", text: "diamond#decision created",
-  });
-  execute("move decision 5 -10");
-  execute("scale decision 2");
-  execute("set decision width 100");
-  assert.deepEqual(session.requireDocument().require("decision").attributes(), {
-    cx: 90, cy: 80, width: 100, height: 80, fill: "gold",
-  });
-
-  execute("undo");
-  assert.deepEqual(session.requireDocument().require("decision").attributes(), {
-    cx: 90, cy: 80, width: 160, height: 80, fill: "gold",
-  });
-  execute("undo");
-  assert.deepEqual(session.requireDocument().require("decision").attributes(), {
-    cx: 45, cy: 40, width: 80, height: 40, fill: "gold",
-  });
-});
-
 test("registry rejects malformed edits and invalid targets without changing the tree or either history stack", () => {
   const { session, registry, first, second } = populatedSession();
   const document = session.requireDocument();

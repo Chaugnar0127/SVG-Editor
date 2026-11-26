@@ -10,7 +10,7 @@ import { CommandRegistry } from "../../src/cli/CommandRegistry.js";
 import { RectShapeProvider } from "../../src/plugins/shapes/RectShapeProvider.js";
 import { BuiltinShapeProvider } from "../../src/plugins/shapes/BuiltinShapeProvider.js";
 
-test("Phase 1 shapes and the diamond extension are unavailable before registration and available after activation", () => {
+test("Phase 1 shapes are unavailable before registration and available after activation", () => {
   const extensions = new ExtensionRegistry();
   const factory = new ShapeFactory(extensions);
   assert.throws(() => factory.create("rect", "r", ["0", "0", "1", "1"]), {
@@ -21,11 +21,13 @@ test("Phase 1 shapes and the diamond extension are unavailable before registrati
   for (const [type, parameters] of [
     ["rect", ["0", "0", "10", "10"]], ["g", []], ["circle", ["0", "0", "5"]],
     ["ellipse", ["0", "0", "5", "4"]], ["line", ["0", "0", "10", "10"]], ["text", ["0", "0", "label"]],
-    ["diamond", ["20", "30", "40", "50"]],
   ] as const) {
     assert.equal(factory.create(type, type, parameters).type, type);
   }
-  assert.deepEqual(extensions.shapeProviders().map(({ name }) => name), ["rect", "g", "circle", "ellipse", "line", "text", "diamond"]);
+  assert.deepEqual(extensions.shapeProviders().map(({ name }) => name), ["rect", "circle", "ellipse", "line", "text", "g"]);
+  assert.throws(() => factory.create("diamond", "d", ["0", "0", "10", "10"]), {
+    message: "unknown shape type: diamond (is the plugin loaded?)",
+  });
 });
 
 test("help follows registered shape syntax without requiring an initialized document", () => {
@@ -38,7 +40,7 @@ test("help follows registered shape syntax without requiring an initialized docu
     assert.ok(result?.kind === "message");
     return result.text;
   };
-  assert.match(help(), /create diamond <id> <cx> <cy> <width> <height> \[fill\]/u);
+  assert.doesNotMatch(help(), /create diamond/u);
   assert.doesNotMatch(help(), /create box/u);
   extensions.install(boxPlugin);
   assert.match(help(), /create box <id> <x> <y> <w> <h> "label"/u);
@@ -97,38 +99,3 @@ test("built-in providers preserve common styles on every shape during SVG readba
   );
 });
 
-test("diamond provider writes a marked SVG polygon and reads it back with geometry and styles", () => {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(builtinShapesPlugin), { success: true });
-  const codec = new SvgCodec(new ShapeFactory(extensions));
-  const document = codec.decode(
-    '<svg xmlns="http://www.w3.org/2000/svg"><polygon id="d" data-shape="diamond" points="35,20 20,35 5,20 20,5" fill="gold" stroke="black"/></svg>',
-  ).document;
-  const diamond = document.require("d");
-  assert.equal(diamond.type, "diamond");
-  assert.deepEqual(diamond.attributes(), { cx: 20, cy: 20, width: 30, height: 30, fill: "gold", stroke: "black" });
-
-  const encoded = codec.encode(document);
-  assert.match(encoded, /<polygon[^>]*data-shape="diamond"[^>]*points="20,5 35,20 20,35 5,20"/u);
-  const copy = codec.decode(encoded).document.require("d");
-  assert.equal(copy.type, "diamond");
-  assert.deepEqual(copy.attributes(), diamond.attributes());
-});
-
-test("diamond provider rejects malformed marked polygons", () => {
-  const extensions = new ExtensionRegistry();
-  assert.deepEqual(extensions.install(builtinShapesPlugin), { success: true });
-  const codec = new SvgCodec(new ShapeFactory(extensions));
-  assert.throws(
-    () => codec.decode('<svg xmlns="http://www.w3.org/2000/svg"><polygon data-shape="diamond" points="0,0 4,0 4,4"/></svg>'),
-    { name: "RangeError", message: "diamond polygon must contain four vertices" },
-  );
-  assert.throws(
-    () => codec.decode('<svg xmlns="http://www.w3.org/2000/svg"><polygon data-shape="diamond" points="0,0 4,0 4,4 0,4"/></svg>'),
-    { name: "RangeError", message: "diamond polygon points must describe an axis-aligned diamond" },
-  );
-  assert.throws(
-    () => codec.decode('<svg xmlns="http://www.w3.org/2000/svg"><polygon data-shape="diamond" points="0,0 4,4 4,0 0,4"/></svg>'),
-    { name: "RangeError", message: "diamond polygon points must describe an axis-aligned diamond" },
-  );
-});
