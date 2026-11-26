@@ -2,7 +2,7 @@
   "name": "svg-editor-vscode",
   "displayName": "SVG Editor SVG Support",
   "description": "File decorations and a document outline for SVG files.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "svg-editor",
   "engines": {
     "vscode": "^1.85.0"
