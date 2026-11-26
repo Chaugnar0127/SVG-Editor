@@ -1,0 +1,8 @@
+{
+  "name": "diamond",
+  "type": "module",
+  "main": "./DiamondPlugin.ts",
+  "contributes": {
+    "shapes": ["diamond"]
+  }
+}

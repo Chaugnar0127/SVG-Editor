@@ -29,6 +29,7 @@ if (invalidStartupArguments) {
     [(await import("./plugins/dir/DirPlugin.js")).default, new URL("./plugins/dir/DirPlugin.js", import.meta.url)],
     [(await import("./plugins/tree/ModifiedStarPlugin.js")).default, new URL("./plugins/tree/ModifiedStarPlugin.js", import.meta.url)],
     [(await import("./plugins/box/BoxPlugin.js")).default, new URL("./plugins/box/BoxPlugin.js", import.meta.url)],
+    [(await import("./plugins/diamond/DiamondPlugin.js")).default, new URL("./plugins/diamond/DiamondPlugin.js", import.meta.url)],
   ] as const;
   const failures: string[] = [];
   for (const [plugin, url] of defaults) {
