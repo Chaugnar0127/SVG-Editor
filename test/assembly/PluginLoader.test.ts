@@ -28,25 +28,10 @@ function writeConfig(directory: string, plugins: readonly unknown[]): string {
   return path;
 }
 
-function simplePlugin(name: string, value: unknown): Plugin {
-  return {
-    manifest: { name, contributes: { commands: [name] } },
-    activate(context) {
-      context.registerCommand({
-        name,
-        usage: name,
-        help: name,
-        execute: () => ({ kind: "message", text: JSON.stringify(value) }),
-      });
-    },
-  };
-}
-
 test("code and config assembly share registration and options behavior", withDirectory(async (directory) => {
   const options = { mode: "tree", threshold: 3 };
   const codedRegistry = new ExtensionRegistry();
   const codedLoader = new PluginLoader(codedRegistry);
-  assert.equal(codedLoader.install(simplePlugin("shared", options), pathToFileURL(join(directory, "shared.mjs")), options), undefined);
 
   writeModule(directory, "shared.mjs", `
     export default {
@@ -62,6 +47,9 @@ test("code and config assembly share registration and options behavior", withDir
     main: "./shared.mjs",
     contributes: { commands: ["shared"] },
   }));
+  const moduleUrl = pathToFileURL(join(directory, "shared.mjs"));
+  const plugin = (await import(moduleUrl.href)).default as Plugin;
+  assert.equal(codedLoader.install(plugin, moduleUrl, options), undefined);
   const configPath = writeConfig(directory, [
     { module: "./shared.mjs", options },
     { module: "./disabled.mjs", enabled: false },
