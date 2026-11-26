@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { ExtensionRegistry } from "../../src/application/extensions/ExtensionRegistry.js";
 import type { Plugin } from "../../src/application/extensions/PluginContracts.js";
@@ -45,7 +46,7 @@ test("code and config assembly share registration and options behavior", withDir
   const options = { mode: "tree", threshold: 3 };
   const codedRegistry = new ExtensionRegistry();
   const codedLoader = new PluginLoader(codedRegistry);
-  assert.equal(codedLoader.install(simplePlugin("shared", options), options), undefined);
+  assert.equal(codedLoader.install(simplePlugin("shared", options), pathToFileURL(join(directory, "shared.mjs")), options), undefined);
 
   writeModule(directory, "shared.mjs", `
     export default {
@@ -141,6 +142,32 @@ test("config validation is all-or-nothing and reports invalid configuration", wi
   assert.deepEqual(await loader.loadConfig(malformed), ["error: invalid plugin config"]);
   assert.deepEqual(registry.commandsList(), []);
   assert.deepEqual(await loader.loadConfig(join(directory, "absent.json")), ["error: invalid plugin config"]);
+}));
+
+test("both assembly modes validate the same package manifest even without entry fields", withDirectory(async (directory) => {
+  const modulePath = writeModule(directory, "manifest-parity.mjs", `export default {
+    manifest: { name: "object-manifest", contributes: { commands: ["actual"] } },
+    activate(context) {
+      context.registerCommand({ name: "actual", usage: "actual", help: "actual",
+        execute: () => ({ kind: "message", text: "actual" }) });
+    }
+  };`);
+  const moduleUrl = pathToFileURL(modulePath);
+  const plugin = (await import(moduleUrl.href)).default as Plugin;
+  for (const entryFields of [{ main: "./manifest-parity.mjs" }, {}]) {
+    writeFileSync(join(directory, "package.json"), JSON.stringify({
+      name: "package-manifest", ...entryFields, contributes: { commands: ["declared"] },
+    }));
+    const codeRegistry = new ExtensionRegistry();
+    const configRegistry = new ExtensionRegistry();
+    const expected = "error: plugin manifest mismatch: package-manifest (declared: commands=[declared], registered: commands=[actual])";
+    assert.equal(new PluginLoader(codeRegistry).install(plugin, moduleUrl), expected);
+    assert.deepEqual(await new PluginLoader(configRegistry).loadConfig(
+      writeConfig(directory, [{ module: "./manifest-parity.mjs" }]),
+    ), [expected]);
+    assert.equal(codeRegistry.command("actual"), undefined);
+    assert.equal(configRegistry.command("actual"), undefined);
+  }
 }));
 
 test("one failed plugin does not block later entries or leak its staged contributions", withDirectory(async (directory) => {

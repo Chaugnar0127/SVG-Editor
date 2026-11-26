@@ -7,7 +7,7 @@ import builtinShapesPlugin from "./plugins/shapes/BuiltinShapesPlugin.js";
 
 const extensions = new ExtensionRegistry();
 const loader = new PluginLoader(extensions);
-const baseFailure = loader.install(builtinShapesPlugin);
+const baseFailure = loader.install(builtinShapesPlugin, new URL("./plugins/shapes/BuiltinShapesPlugin.js", import.meta.url));
 if (baseFailure !== undefined) throw new Error(baseFailure);
 
 const startupArguments = process.argv.slice(2);
@@ -25,14 +25,19 @@ if (invalidStartupArguments) {
   pluginErrors = await loader.loadConfig(configPath);
 } else {
   const defaults = [
-    (await import("./plugins/stats/StatsPlugin.js")).default,
-    (await import("./plugins/dir/DirPlugin.js")).default,
-    (await import("./plugins/tree/ModifiedStarPlugin.js")).default,
-    (await import("./plugins/box/BoxPlugin.js")).default,
+    "./plugins/stats/StatsPlugin.js",
+    "./plugins/dir/DirPlugin.js",
+    "./plugins/tree/ModifiedStarPlugin.js",
+    "./plugins/box/BoxPlugin.js",
   ];
-  pluginErrors = defaults
-    .map((plugin) => loader.install(plugin))
-    .filter((failure): failure is string => failure !== undefined);
+  const failures: string[] = [];
+  for (const module of defaults) {
+    const url = new URL(module, import.meta.url);
+    const plugin = (await import(url.href)).default;
+    const failure = loader.install(plugin, url);
+    if (failure !== undefined) failures.push(failure);
+  }
+  pluginErrors = failures;
 }
 for (const error of pluginErrors) console.log(error);
 

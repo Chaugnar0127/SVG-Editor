@@ -19,8 +19,18 @@ export class PluginLoader {
   public constructor(private readonly registry: ExtensionRegistry) {}
 
   /** 代码装配入口；options 与配置装配使用相同的 activate 参数。 */
-  public install(plugin: Plugin, options?: unknown): string | undefined {
-    const result = this.registry.install(plugin, options);
+  public install(plugin: Plugin, moduleUrl: URL, options?: unknown): string | undefined {
+    const packageMetadata = packageManifest(fileURLToPath(moduleUrl));
+    if (packageMetadata.kind === "invalid") {
+      return `error: plugin failed to load: ${moduleUrl.href} (invalid package manifest)`;
+    }
+    const candidate: Plugin = packageMetadata.kind === "manifest"
+      ? {
+        manifest: packageMetadata.manifest,
+        activate: (context: PluginContext, passedOptions?: unknown) => plugin.activate(context, passedOptions),
+      }
+      : plugin;
+    const result = this.registry.install(candidate, options);
     return result.success ? undefined : this.formatFailure(result.failure);
   }
 
@@ -69,18 +79,7 @@ export class PluginLoader {
         errors.push(`error: plugin failed to load: ${entry.module} (invalid default export)`);
         continue;
       }
-      const packageMetadata = packageManifest(resolvedModule);
-      if (packageMetadata.kind === "invalid") {
-        errors.push(`error: plugin failed to load: ${entry.module} (invalid package manifest)`);
-        continue;
-      }
-      const plugin: Plugin = packageMetadata.kind === "manifest"
-        ? {
-          manifest: packageMetadata.manifest,
-          activate: (context: PluginContext, options?: unknown) => exported.plugin.activate(context, options),
-        }
-        : exported.plugin;
-      const failure = this.install(plugin, entry.options);
+      const failure = this.install(exported.plugin, pathToFileURL(resolvedModule), entry.options);
       if (failure !== undefined) errors.push(failure);
     }
     return errors;
@@ -166,7 +165,9 @@ function packageManifest(modulePath: string): PackageManifestResult {
       const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as unknown;
       if (typeof value !== "object" || value === null) return { kind: "invalid" };
       const candidate = value as { name?: unknown; main?: unknown; exports?: unknown; contributes?: unknown };
-      if (typeof candidate.main !== "string" && candidate.exports === undefined) return { kind: "none" };
+      if (!Object.hasOwn(candidate, "contributes") && typeof candidate.main !== "string" && candidate.exports === undefined) {
+        return { kind: "none" };
+      }
       if (typeof candidate.name !== "string" || candidate.name.trim().length === 0) return { kind: "invalid" };
       const contributes = candidate.contributes ?? {};
       if (!validContributions(contributes)) return { kind: "invalid" };
